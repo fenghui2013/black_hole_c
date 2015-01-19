@@ -1,9 +1,12 @@
 #include <sys/types.h>
-#include <sys.socket.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <string.h>
 
 #include "bh_socket.h"
 
@@ -77,18 +80,20 @@ bh_socket_listen(int sock_fd, int backlog) {
     }
     return res;
 }
+
 /*
  * new_fd > 0, normal
  * new_fd == 0, again
  * new_fd == -1, error
  */
 int
-bh_socket_accept(int sock_fd, char *ip, int *port) {
+bh_socket_accept(int sock_fd, char **ip, int *port) {
     int new_fd;
     struct sockaddr_in remote_addr;
+    socklen_t len = sizeof(remote_addr);
     memset(&remote_addr, 0, sizeof(remote_addr));
     
-    new_fd = accept(sock_fd, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr));
+    new_fd = accept(sock_fd, (struct sockaddr *)&remote_addr, &len);
     if (-1 == new_fd) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return 0;
@@ -96,14 +101,14 @@ bh_socket_accept(int sock_fd, char *ip, int *port) {
         return -1;
     }
 
-    ip = inet_ntoa(remote_addr.sin_addr);
+    *ip = inet_ntoa(remote_addr.sin_addr);
     *port = ntohs(remote_addr.sin_port);
 
     return new_fd;
 }
 
-void
-bh_socket_connect(int sock_fd, char *ip, int port) {
+int
+bh_socket_connect(int sock_fd, const char *ip, int port) {
     int res;
     struct sockaddr_in new_addr;
 
@@ -124,10 +129,10 @@ bh_socket_connect(int sock_fd, char *ip, int port) {
  * n == -2, again
  */
 int
-bh_socket_recv(int sock_fd, char *buffer, int size) {
+bh_socket_recv(int sock_fd, char **buffer, int size) {
     int n;
 
-    n = read(sock_fd, buffer, size);
+    n = read(sock_fd, *buffer, size);
     if (-1 == n) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return -2;
@@ -143,7 +148,7 @@ bh_socket_recv(int sock_fd, char *buffer, int size) {
  * n == -2, again
  */
 int
-bh_socket_send(int sock_fd, char *buffer, int size) {
+bh_socket_send(int sock_fd, const char *buffer, int size) {
     int n;
 
     n = write(sock_fd, buffer, size);

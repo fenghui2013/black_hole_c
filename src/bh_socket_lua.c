@@ -1,5 +1,7 @@
 #include <lua.h>
 #include <lauxlib.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "bh_socket.h"
 
@@ -34,8 +36,9 @@ _nonblocking(lua_State *L) {
 static int
 _tcpnodelay(lua_State *L) {
     int sock_fd = luaL_checkint(L, 1);
+    int enable = luaL_checkint(L, 2);
 
-    bh_socket_tcpnodelay(sock_fd);
+    bh_socket_tcpnodelay(sock_fd, enable);
 
     return 0;
 }
@@ -61,14 +64,20 @@ _listen(lua_State *L) {
     return 0;
 }
 
+/*
+ * new_fd > 0, normal
+ * new_fd == 0, again
+ * new_fd == -1, error
+ */
 static int
 _accept(lua_State *L) {
     int sock_fd = luaL_checkint(L, 1);
-    char *ip;
+    char *ip = (char *)malloc(15*sizeof(char));
     int port;
     int new_fd;
-
-    new_fd = bh_socket_accept(sock_fd, ip, &port);
+    
+    memset(ip, 0, 15*sizeof(char));
+    new_fd = bh_socket_accept(sock_fd, &ip, &port);
     if (new_fd > 0)
         goto normal;
     if (new_fd == 0)
@@ -77,7 +86,7 @@ _accept(lua_State *L) {
         goto error;
 normal:
     lua_pushinteger(L, new_fd);
-    lua_pushstring(L, ip);
+    lua_pushstring(L, (const char *)ip);
     lua_pushinteger(L, port);
     return 3;
 again:
@@ -103,6 +112,11 @@ _connect(lua_State *L) {
     return 0;    
 }
 
+/*
+ * n >= 0, normal
+ * n == -1, error
+ * n == -2, again
+ */
 static int
 _recv(lua_State *L) {
     int sock_fd = luaL_checkint(L, 1);
@@ -110,7 +124,7 @@ _recv(lua_State *L) {
     char *buffer = (char *)malloc(size*sizeof(char));
     int recv_size;
 
-    recv_size = bh_socket_recv(sock_fd, buffer, size);
+    recv_size = bh_socket_recv(sock_fd, &buffer, size);
     if (recv_size >= 0)
         goto normal;
     if (recv_size == -1)
@@ -131,6 +145,11 @@ again:
     return 2;
 }
 
+/*
+ * n >= 0, normal
+ * n == -1, error
+ * n == -2, again
+ */
 static int
 _send(lua_State *L) {
     int sock_fd = luaL_checkint(L, 1);
