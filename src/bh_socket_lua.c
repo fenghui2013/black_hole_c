@@ -179,7 +179,7 @@ again:
 }
 
 int
-luaopen_socket(lua_State *L) {
+luaopen_bh_socket(lua_State *L) {
     luaL_Reg l[] = {
         {"create", _create},
         {"close", _close},
