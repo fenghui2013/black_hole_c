@@ -36,6 +36,17 @@ _set(lua_State *L) {
 }
 
 static int
+_update(lua_State *L) {
+    bh_string *string = (bh_string *)lua_touserdata(L, 1);
+    int len = luaL_checkint(L, 2);
+    int res;
+
+    res = bh_string_update(string, len);
+    lua_pushinteger(L, res);
+    return 1;
+}
+
+static int
 _get(lua_State *L) {
     bh_string *string = (bh_string *)lua_touserdata(L, 1);
     char *s;
@@ -82,6 +93,7 @@ luaopen_bh_string(lua_State *L) {
         {"create", _create},
         {"release", _release},
         {"set", _set},
+        {"update", _update},
         {"get", _get},
         {"get_size", _get_size},
         {"get_len", _get_len},

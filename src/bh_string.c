@@ -19,7 +19,7 @@ bh_string_create(int size) {
     bh_string *string;
 
     string = (bh_string *)malloc(sizeof(bh_string));
-    string->s = (char *)malloc((size+1)*sizeof(char));
+    string->s = (char *)malloc((size+2)*sizeof(char));
     string->size = size;
     string->free = size;
     string->start = 0;
@@ -42,27 +42,36 @@ bh_string_expansion(bh_string *string) {
 
     if (string->size < MEM_THRESHOLD) {
         new_size = 2*string->size;
-        new_s = (char *)malloc(new_size*sizeof(char));
+        new_s = (char *)malloc((new_size+2)*sizeof(char));
     } else {
         new_size = string->size+MEM_STEP;
-        new_s = (char *)malloc(new_size*sizeof(char));
+        new_s = (char *)malloc((new_size+2)*sizeof(char));
     }
 
-    for (i=1, j=string->start; j<=string->end; i++, j++) {
-        new_s[i] = string->s[j];
+    if (string->start == 0) {
+        free(string->s);
+        string->s = new_s;
+        string->size = new_size;
+        string->free = new_size;
+        string->start = 1;
+    } else {
+        for (i=1, j=string->start; j<=string->end; i++, j++) {
+            new_s[i] = string->s[j];
+        }
+        free(string->s);
+        string->s = new_s;
+        string->size = new_size;
+        string->start = 1;
+        string->end = i-1;
+        string->free = string->size-string->end;
     }
-    free(string->s);
-    string->s = new_s;
-    string->size = new_size;
-    string->start = 1;
-    string->end = i-1;
-    string->free = string->size-string->end;
 }
 
 void
 bh_string_set(bh_string *string, char *s, int start, int size, int appending) {
     int i, j;
-
+    
+    if (size <= 0) return;
     if (appending) {
         while (size > string->free) bh_string_expansion(string);
         for (i=string->end+1, j=start; j<size; i++, j++) {
@@ -80,10 +89,27 @@ bh_string_set(bh_string *string, char *s, int start, int size, int appending) {
         string->free = string->size-string->end;
     }
 }
+/*
+ * -1, argument len invalid
+ * 0, mem is valid
+ * 1, mem is invalid
+ */
+int
+bh_string_update(bh_string *string, int len) {
+    if (len <= 0) return -1;
+    string->start += len;
+    if (string->start == string->size+1) {
+        string->free = string->size;
+        string->start = 0;
+        string->end = 0;
+        return 1;
+    }
+    return 0;
+}
 
 char *
 bh_string_get(bh_string *string) {
-    return string->s+1;
+    return string->s+string->start;
 }
 
 int
