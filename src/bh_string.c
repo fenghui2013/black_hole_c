@@ -3,8 +3,7 @@
 
 #include "bh_string.h"
 
-#define MEM_THRESHOLD 1024*64
-#define MEM_STEP 1024*16
+#define MEM_THRESHOLD 1024*16
 
 struct bh_string {
     char *s;
@@ -22,8 +21,8 @@ bh_string_create(int size) {
     string->s = (char *)malloc((size+2)*sizeof(char));
     string->size = size;
     string->free = size;
-    string->start = 0;
-    string->end = 0;
+    string->start = 1;
+    string->end = 1;
 
     return string;
 }
@@ -32,79 +31,60 @@ void
 bh_string_release(bh_string *string) {
     free(string->s);
     free(string);
+    string = NULL;
 }
 
-static void
-bh_string_expansion(bh_string *string) {
+/*
+ * 0, expansion fail 
+ * 1, expansion success 
+ */
+int
+bh_string_expansion(bh_string *string, int max_size) {
     char *new_s;
     int new_size;
     int i, j;
 
-    if (string->size < MEM_THRESHOLD) {
-        new_size = 2*string->size;
-        new_s = (char *)malloc((new_size+2)*sizeof(char));
-    } else {
-        new_size = string->size+MEM_STEP;
-        new_s = (char *)malloc((new_size+2)*sizeof(char));
-    }
+    // expansion fail
+    if (string->size > max_size) return 0;
 
-    if (string->start == 0) {
-        free(string->s);
-        string->s = new_s;
-        string->size = new_size;
-        string->free = new_size;
-        string->start = 1;
-    } else {
-        for (i=1, j=string->start; j<=string->end; i++, j++) {
-            new_s[i] = string->s[j];
-        }
-        free(string->s);
-        string->s = new_s;
-        string->size = new_size;
-        string->start = 1;
-        string->end = i-1;
-        string->free = string->size-string->end;
+    new_size = 2*string->size;
+    new_s = (char *)malloc((new_size+2)*sizeof(char));
+
+    for (i=1, j=string->start; j<=string->end; i++, j++) {
+        new_s[i] = string->s[j];
     }
+    free(string->s);
+    string->s = new_s;
+    string->size = new_size;
+    string->start = 1;
+    string->end = i-1;
+    string->free = string->size-string->end;
+    return 1;
 }
 
-void
-bh_string_set(bh_string *string, char *s, int start, int size, int appending) {
-    int i, j;
-    
-    if (size <= 0) return;
-    if (appending) {
-        while (size > string->free) bh_string_expansion(string);
-        for (i=string->end+1, j=start; j<size; i++, j++) {
-            string->s[i] = s[j];
-        }
-        string->end = string->end + size;
-        string->free = string->size-string->end;
-    } else {
-        while (size > string->size) bh_string_expansion(string);
-        for (i=1, j=start; j<size; i++, j++) {
-            string->s[i] = s[j];
-        }
-        string->start = 1;
-        string->end = size;
-        string->free = string->size-string->end;
-    }
-}
 /*
  * -1, argument len invalid
- * 0, mem is valid
- * 1, mem is invalid
+ * 0, mem is not reset
+ * 1, mem is reset
  */
 int
-bh_string_update(bh_string *string, int len) {
+bh_string_update_start(bh_string *string, int len) {
     if (len <= 0) return -1;
     string->start += len;
     if (string->start == string->size+1) {
         string->free = string->size;
-        string->start = 0;
-        string->end = 0;
+        string->start = 1;
+        string->end = 1;
         return 1;
     }
     return 0;
+}
+
+void
+bh_string_update_end(bh_string *string, int len) {
+    if (len <= 0) return -1;
+    string->end += len;
+    string->free = string->size-string->end;
 }
 
 char *
@@ -119,9 +99,7 @@ bh_string_get_size(bh_string *string) {
 
 int
 bh_string_get_len(bh_string *string) {
-    int len = string->end-string->start+1;
-    if (string->start==0 && string->start==string->end) len = 0;
-    return len;
+    return string->end - string->start + 1;
 }
 
 int

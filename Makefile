@@ -9,7 +9,7 @@ CFLAGS := -O2 -Wall
 SHARED := -fPIC --shared
 
 LUA_CLIB_PATH ?= lualib_c
-LUA_CLIB = bh_socket bh_string
+LUA_CLIB = bh_socket
 
 all: \
 	$(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so)
@@ -20,8 +20,7 @@ $(LUA_CLIB_PATH):
 $(LUA_CLIB_PATH)/bh_socket.so: src/bh_socket.c src/bh_socket_lua.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ $(LUA_INC) $(LUA_FLAGS)
 
-$(LUA_CLIB_PATH)/bh_string.so: src/bh_string.c src/bh_string_lua.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ $(LUA_INC) $(LUA_FLAGS)
-
 clean:
 	rm -rf $(LUA_CLIB_PATH)/*.so
+cleanall:
+	rm -rf $(LUA_CLIB_PATH)
