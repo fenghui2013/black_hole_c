@@ -1,4 +1,5 @@
 #ifndef _BH_STRING_H_
+#define _BH_STRING_H_
 
 typedef struct bh_string bh_string;
 

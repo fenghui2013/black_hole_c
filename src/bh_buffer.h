@@ -1,4 +1,5 @@
 #ifndef _BH_BUFFER_H_
+#define _BH_BUFFER_H_
 
 typedef struct bh_buffer bh_buffer;
 

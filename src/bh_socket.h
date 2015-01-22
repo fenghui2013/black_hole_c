@@ -1,4 +1,5 @@
 #ifndef _BH_SOCKET_H_
+#define _BH_SOCKET_H_
 
 int  bh_socket_create();
 int  bh_socket_close(int sock_fd);
