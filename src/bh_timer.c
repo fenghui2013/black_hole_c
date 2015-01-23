@@ -7,6 +7,7 @@
 struct bh_timer_node {
     uint64_t start_time;         // start time
     uint64_t trigger_time;       // trigger time
+    int time;                    // timeout
     int times;                   // loop times, -1:forever
     bh_timer_handler handler;
     void *handler_arg;
@@ -56,12 +57,20 @@ bh_timer_release(bh_timer *timer) {
 }
 
 static bh_timer_node *
-binary_search(bh_timer_node *common, uint64_t trigger_time) {
-
+_search(bh_timer_node *common, uint64_t trigger_time) {
+    bh_timer_node *node = common, *prev = NULL;
+    while (node) {
+        if (trigger_time < node->trigger_time) {
+            break;
+        }
+        prev = node;
+        node = node->next;
+    }
+    return prev;
 }
 
 static uint64_t
-get_systime() {
+_get_systime() {
     struct timeval ev;
 
     gettimeofday(&ev, NULL);
@@ -70,24 +79,31 @@ get_systime() {
 }
 
 void
-bh_timer_set(bh_timer *timer, int time, int times, bh_timer_handler handler, void *handler_arg) {
-    bh_timer_node *node = (bh_timer_node *)malloc(sizeof(bh_timer_node));
-    node->start_time = get_systime();
-    node->trigger_time = node->start_time + time;
-    node->times = times;
-    node->handler = hanlder;
-    node->handler_arg = handler_arg;
-
-    bh_timer_node *prev = binary_search(timer->common, node->trigger_time);
+_bh_timer_set(bh_timer *timer, bh_timer_node *node) {
+    bh_timer_node *prev = _search(timer->common, node->trigger_time);
     if (prev != NULL) {
         node->next = prev->next;
         prev->next = node;
     } else {
-        node->next = NULL;
+        node->next = timer->common;
         timer->common = node;
     }
     timer->common_count += 1;
 }
+
+void
+bh_timer_set(bh_timer *timer, int time, int times, bh_timer_handler handler, void *handler_arg) {
+    bh_timer_node *node = (bh_timer_node *)malloc(sizeof(bh_timer_node));
+    node->start_time = _get_systime();
+    node->trigger_time = node->start_time + time;
+    node->time = time;
+    node->times = times;
+    node->handler = hanlder;
+    node->handler_arg = handler_arg;
+
+    _bh_timer_set(timer, node);
+}
+
 /*
  * >= 0,
  * == -1, no timer
@@ -99,6 +115,8 @@ bh_timer_get(bh_timer *timer) {
     timer->execute = timer->common;
     node = timer->common;
     while (node) {
+        timer->execute_count += 1;
+        timer->common_count -= 1;
         if (node->next == NULL) {
             timer->common = NULL;
             break;
@@ -110,10 +128,10 @@ bh_timer_get(bh_timer *timer) {
         }
         node = node->next;
     }
-    if (timer->execute == NULL) {
+    if (timer->execute_count == 0) {
         return -1;
     }
-    return (int)(timer->execute->trigger_time-get_systime());
+    return (int)(timer->execute->trigger_time-_get_systime());
 }
 
 void
@@ -122,8 +140,15 @@ bh_timer_execute(bh_timer *timer) {
     
     while (timer->execute) {
         node = timer->execute;
-        (*node->handler)(node->handler_arg);
         timer->execute = timer->execute->next;
-        free(node);
+        timer->execute_count -= 1;
+        (*node->handler)(node->handler_arg);
+        if (node->times>0 || node->times==-1) {
+            node->trigger_time = _get_systime() + node->time;
+            node->times = (node->times==-1) ? node->times : (node->times-1);
+            _bh_timer_set(timer, node);
+        } else {
+            free(node);
+        }
     }
 }
