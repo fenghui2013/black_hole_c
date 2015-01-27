@@ -14,7 +14,7 @@ void bh_event_release(int event_fd);
 int  bh_event_add(int event_fd, int sock_fd);
 void bh_event_del(int event_fd, int sock_fd);
 int  bh_event_write(int event_fd, int sock_fd, int enable);
-int  bh_event_poll(int event_fd, bh_event *e, int max);
+int  bh_event_poll(int event_fd, bh_event *e, int max, int timeout);
 
 #ifdef __linux__
 #include "bh_epoll.h"

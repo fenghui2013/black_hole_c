@@ -3,7 +3,7 @@
 
 typedef struct bh_engine bh_engine;
 
-bh_engine * bh_engine_create();
+bh_engine * bh_engine_create(char *ip, int port, int num, ...);
 void        bh_engine_start(bh_engine *engine);
 void        bh_engine_stop(bh_engine *engine);
 

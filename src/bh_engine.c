@@ -14,6 +14,7 @@ struct client_node {
     int port;
     bh_buffer *recv_buffer;
     bh_buffer *send_buffer;
+    client_node *prev;
     client_node *next;
 };
 
@@ -31,22 +32,28 @@ struct bh_engine {
     int sock_fd; // listen socket fd
     char *ip;
     int port;
+    bh_timer *timer;
     client_list *list;
+    bh_module *module;
 };
 
 bh_engine *
-bh_engine_create() {
+bh_engine_create(char *ip, int port, int num, ...) {
     bh_engine *engine = (bh_engine *)malloc(sizeof(bh_engine));
 
     engine->event_fd = bh_event_create();
     engine->max_event = 256;
     engine->events_buffer = (bh_event *)malloc(256*sizeof(bh_event));
     engine->sock_fd = bh_socket_create();
+    engine->ip = ip;
+    engine->port = port;
+    engine->timer = bh_timer_create();
     engine->list = (client_list *)malloc(sizeof(client_list));
     engine->list->first = NULL;
     engine->list->last = NULL;
     engine->list->client_count = 0;
-
+    engine->module = bh_module_create();
+    bh_module_load(engine->module, num, ...);
     return engine;
 }
 
@@ -66,49 +73,19 @@ _open_client(bh_engine *engine) {
     client->recv_buffer = bh_buffer_create(1024, 8*1024);
     client->send_buffer = bh_buffer_create(1024, 8*1024);
     client->next = NULL;
+    client->prev = NULL;
     if (engine->list->first == NULL) {
         engine->list->first = client;
         engine->list->last = client;
         engine->list->client_count += 1;
     } else {
         engine->list->last->next = client;
+        client->prev = engine->list->last;
         engine->list->last = client;
         engine->list->client_count += 1;
     }
+    bh_module_init(engine->module, engine, client->sock_fd);
     bh_event_add(engine->event_fd, client->sock_fd);
-}
-
-static client_node *
-_find_prev(bh_engine *engine, int sock_fd) {
-    client_node *node = engine->list->first;
-    client_node *prev = NULL;
-
-    while (node) {
-        if (node->sock_fd == sock_fd) break;
-        prev = node;
-        node = node->next;
-    }
-    return prev;
-}
-
-static void
-_close_client(bh_engine *engine, int sock_fd) {
-    client_node *prev = _find_prev(engine, sock_fd), *temp;
-
-    if (prev == NULL) {
-        free(engine->list->first);
-        engine->list->first = NULL;
-        engine->list->last = NULL;
-        engine->list->client_count -= 1;
-    } else if (prev->next->next == NULL) {
-        temp = prev->next;
-        prev->next = temp->next;
-        free(temp);
-        engine->list->last = prev;
-    } else if (prev->next == NULL) {
-        temp = prev->next;
-        prev
-    }
 }
 
 static client_node *
@@ -123,17 +100,42 @@ _find(bh_engine *engine, int sock_fd) {
     return node;
 }
 
+static void
+_close_client(bh_engine *engine, int sock_fd) {
+    client_node *node = _find(engine, sock_fd);
+
+    if (node->prev==NULL && node->next==NULL) {
+        engine->list->first = NULL;
+        engine->list->last = NULL;
+    } else if (node->prev==NULL && node->next!=NULL) {
+        engine->list->first = node->next;
+        node->next->prev = NULL;
+    } else if (node->prev!=NULL && node->next==NULL) {
+        engine->list->last = node->prev;
+        node->prev->next = NULL;
+    } else {
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+    }
+    engine->list->client_count -= 1;
+    bh_event_del(engine->event_fd, sock_fd);
+    bh_buffer_release(node->recv_buffer);
+    bh_buffer_release(node->send_buffer);
+    bh_socket_close(node->sock_fd);
+    free(node);
+    node = NULL;
+}
+
 /*
  * 1, socket normal
  * 0, socket close
  * -1, socket error
  */
-static int 
+static int
 _read(bh_engine *engine, int sock_fd) {
     client_node *node = _find(engine, sock_fd);
     char *buffer;
-    int size;
-    int res;
+    int res, size;
 
     while (1) {
         size = bh_buffer_get_write(node->recv_buffer, buffer);
@@ -141,7 +143,7 @@ _read(bh_engine *engine, int sock_fd) {
         switch (res) {
             case -2:
                 // again
-                continue;
+                break;
             case -1:
                 // error close
                 return -1;
@@ -150,23 +152,60 @@ _read(bh_engine *engine, int sock_fd) {
                 return 0;
             default:
                 bh_buffer_set_write(node->recv_buffer, res);
+        }
+    }
+    return 1;
+}
+
+/*
+ * 1, normal
+ * -1, error
+ */
+static int
+_write(bh_engine *engine, int sock_fd) {
+    client_node *node = _find(engine, sock_fd);
+    char *buffer;
+    int res, size;
+
+    while (1) {
+        size = bh_buffer_get_read(node->send_buffer, buffer);
+        if (size == 0) return 0;
+        res = bh_socket_send(sock_fd, buffer);
+        switch(res) {
+            case -2:
+                // again
                 break;
+            case -1:
+                // error
+                return -1;
+            default:
+                bh_buffer_set_read(node->send_buffer, res);
         }
     }
     return 1;
 }
 
 static void
-_write(bh_engine *engine, int sock_fd) {
+_send_to_application_layer(bh_engine *engine, int sock_fd) {
+    client_node *node = _find(engine, sock_fd);
+    char *buffer;
+    int size;
+
+    while (1) {
+        size = bh_buffer_get_read(node->send_buffer, buffer);
+        if (size == 0) break;
+        bh_module_recv(engine->module, sock_fd, buffer);
+        bh_buffer_set_read(node->recv_buffer, size);
+    }
 }
 
-void
-bh_engine_start(bh_engine *engine) {
-    int events_num = 0, i, res;
+static void
+_run_server(bh_engine *engine) {
+    int events_num = 0, i, res, timeout;
 
-    _init_server(engine);
     while (1) {
-        events_num = bh_event_poll(engine->event_fd, engine->events_buffer, engine->max_event);
+        timeout = bh_timer_get(engine->timer);
+        events_num = bh_event_poll(engine->event_fd, engine->events_buffer, engine->max_event, timeout);
         for (i=0; i<events_num; i++) {
             if (engine->event_buffer[i].fd == engine->sock_fd) {
                 // accept new client
@@ -175,19 +214,51 @@ bh_engine_start(bh_engine *engine) {
                 // read or write
                 if (engine->events_buffer[i].read) {
                     res = _read(engine, engine->events_buffer[i].fd);
-                    if (res == 0 || res == -1) {
+                    if (res == 1) {
+                        _send_to_application_layer(engine, engine->events_buffer[i].fd);
+                    } else if (res == 0 || res == -1) {
                         _close_client(engine, engine->events_buffer[i].fd);
+                        bh_module_recv(engine->module, engine->events_buffer[i].fd, "");
                     }
                 }
 
                 if (engine->events_buffer[i].write) {
-                    _write(engine, engine->events_buffer[i].fd);
+                    res = _write(engine, engine->events_buffer[i].fd);
+                    // write data done
+                    if (res == 0) {
+                        bh_event_del(engine->event_fd, engine->events_buffer[i].fd);
+                    }
+                    // write data error
+                    if (res == -1) {
+                        _close_client(engine, engine->events_buffer[i].fd);
+                    }
                 }
             }
         }
+        bh_timer_execute(engine->timer);
     }
 }
 
 void
+bh_engine_start(bh_engine *engine) {
+    _init_server(engine);
+    _run_server(engine);
+}
+
+void
 bh_engine_stop(bh_engine *engine) {
+    client_node *node = engine->list->first;
+
+    while(node) {
+        _close_client(engine, node->sock_fd);
+    }
+    free(engine->list);
+    bh_module_release(engine->module);
+    bh_timer_release(engine->timer);
+    bh_event_del(engine->event_fd, engine->sock_fd);
+    bh_socket_close(engine->sock_fd);
+    free(engine->events_buffer);
+    bh_event_release(engine->event_fd);
+    free(engine);
+    engine = NULL;
 }

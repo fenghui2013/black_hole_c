@@ -9,8 +9,7 @@ struct bh_timer_node {
     uint64_t trigger_time;       // trigger time
     int time;                    // timeout
     int times;                   // loop times, -1:forever
-    bh_timer_handler handler;
-    void *handler_arg;
+    char *handler_name;
     struct bh_timer_node *next;
 };
 typedef struct bh_timer_node bh_timer_node;
@@ -92,26 +91,28 @@ _bh_timer_set(bh_timer *timer, bh_timer_node *node) {
 }
 
 void
-bh_timer_set(bh_timer *timer, int time, int times, bh_timer_handler handler, void *handler_arg) {
+bh_timer_set(bh_timer *timer, int time, int times, char *handler_name) {
     bh_timer_node *node = (bh_timer_node *)malloc(sizeof(bh_timer_node));
     node->start_time = _get_systime();
     node->trigger_time = node->start_time + time;
     node->time = time;
     node->times = times;
-    node->handler = hanlder;
-    node->handler_arg = handler_arg;
+    node->handler_name = handler_name;
 
     _bh_timer_set(timer, node);
 }
 
 /*
- * >= 0,
+ * >= 0, timeout time
  * == -1, no timer
  */
 int
 bh_timer_get(bh_timer *timer) {
     bh_timer_node *node;
 
+    if (timer->execute != NULL) {
+        return (int)(timer->execute->trigger_time-_get_systime());
+    }
     timer->execute = timer->common;
     node = timer->common;
     while (node) {
@@ -137,12 +138,16 @@ bh_timer_get(bh_timer *timer) {
 void
 bh_timer_execute(bh_timer *timer) {
     bh_timer_node *node;
+    uint64_t current_time = _get_systime();
     
     while (timer->execute) {
+        if (current_time < timer->execute->trigger_time) {
+            break;
+        }
         node = timer->execute;
         timer->execute = timer->execute->next;
         timer->execute_count -= 1;
-        (*node->handler)(node->handler_arg);
+        //bh_module_timeout_handler(node->handler_name);
         if (node->times>0 || node->times==-1) {
             node->trigger_time = _get_systime() + node->time;
             node->times = (node->times==-1) ? node->times : (node->times-1);

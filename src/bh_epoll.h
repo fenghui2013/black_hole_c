@@ -16,7 +16,7 @@ bh_event_release(int event_fd) {
 int
 bh_event_add(int event_fd, int sock_fd) {
     struct epoll_event ev;
-    ev.events = EPOLLIN;
+    ev.events = EPOLLET | EPOLLIN;
     ev.data.fd = sock_fd;
     if (epoll_ctl(event_fd, EPOLL_CTL_ADD, sock_fd, &ev) == -1) {
         return 0;
@@ -32,7 +32,7 @@ bh_event_del(int event_fd, int sock_fd) {
 int
 bh_event_write(int event_fd, int sock_fd, int enable) {
     struct epoll_event ev;
-    ev.events = EPOLLIN | (enable ? EPOLLOUT : 0);
+    ev.events = EPOLLET | EPOLLIN | (enable ? EPOLLOUT : 0);
     ev.data.fd = sock_fd;
     if (epoll_ctl(event_fd, EPOLL_CTL_ADD, sock_fd, &ev) == -1) {
         return 0;
@@ -49,8 +49,8 @@ bh_event_poll(int event_fd, bh_event *e, int max, int timeout) {
     for (i=0; i<n; i++) {
         e[i].fd = ev[i].data.fd;
         flag = ev[i].events;
-        e[i].write = flag & EPOLLOUT;
-        e[i].read = flag & EPOLLIN;
+        e[i].write = (flag&EPOLLOUT) ? 1 : 0;
+        e[i].read = (flag&EPOLLIN) ? 1 : 0;
     }
     return n;
 }
