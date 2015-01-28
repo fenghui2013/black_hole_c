@@ -10,25 +10,27 @@ struct bh_module {
     lua_State *L;
 };
 
-bh_module *
-bh_module_create() {
-    bh_module *module = (bh_module *)malloc(sizeof(bh_module));
+bh_module *module = NULL;
 
-    module->L = luaL_newstate();
-    luaL_openlibs(module->L);
+void
+bh_module_create() {
+    if (module == NULL) {
+        *module = (bh_module *)malloc(sizeof(bh_module));
+        module->L = luaL_newstate();
+        luaL_openlibs(module->L);
+    }
     
-    return module;
 }
 
 void
-bh_module_release(bh_module *module) {
+bh_module_release() {
     lua_close(module->L);
     free(module);
     module = NULL;
 }
 
 void
-bh_module_load(bh_module *module, int num, ...) {
+bh_module_load(int num, ...) {
     va_list arg_ptr;
     char *mod_name;
     int i;
@@ -42,16 +44,27 @@ bh_module_load(bh_module *module, int num, ...) {
 }
 
 static void
-_init(lua_State *L, bh_engine *engine, int sock_fd) {
+_set_engine(lua_State *L, bh_engine *engine) {
+    lua_getglobal(L, "set_engine");
+    lua_pushlightuserdata(L, (void *)engine);
+    lua_call(L, 1, 0);
+}
+
+void
+bh_module_set_engine(bh_engine *engine) {
+    _set_engine(module->L, engine);
+}
+
+static void
+_init(lua_State *L, int sock_fd) {
     lua_getglobal(L, "init");
-    lua_pushlightuserdata(L, engine);
     lua_pushinteger(L, sock_fd);
     lua_call(L, 1, 0);
 }
 
 void
-bh_module_init(bh_module *module, bh_engine *engine, int sock_fd) {
-    _init(module->L, engine, sock_fd);
+bh_module_init(int sock_fd) {
+    _init(module->L, sock_fd);
 }
 
 static void
@@ -63,6 +76,17 @@ _recv(lua_State *L, int sock_fd, char *data) {
 }
 
 void
-bh_module_recv(bh_module *module, int sock_fd, char *data) {
+bh_module_recv(int sock_fd, char *data) {
     _recv(module->L, engine, sock_fd, data);
+}
+
+_timeout_handler(lua_State *L, char *handler_name) {
+    lua_getglobal(L, "timeout_handler");
+    lua_pushstring(L, handler_name);
+    lua_call(L, 1, 0);
+}
+
+void
+bh_module_timeout_handler(char *handler_name) {
+    _timeout_handler(module->L, handler_name);
 }

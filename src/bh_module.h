@@ -3,11 +3,11 @@
 
 #include "bh_engine.h"
 
-typedef struct bh_module bh_module;
-
-bh_module * bh_module_create();
-void        bh_module_release(bh_module *module);
-void        bh_module_load(bh_module *module, int num, ...);
-void        bh_module_init(bh_module *module, bh_engine *engine, int sock_fd);
-void        bh_module_recv(bh_module *module, int sock_fd, char *data);
+void        bh_module_create();
+void        bh_module_release();
+void        bh_module_load(int num, ...);
+void        bh_module_set_engine(bh_engine *engine);
+void        bh_module_init(int sock_fd);
+void        bh_module_recv(int sock_fd, char *data);
+void        bh_module_timeout_handler(char *handler_name);
 #endif

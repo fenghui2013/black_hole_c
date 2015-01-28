@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include "bh_module.h"
 #include "bh_timer.h"
 
 // unit: millisecond
@@ -147,7 +148,7 @@ bh_timer_execute(bh_timer *timer) {
         node = timer->execute;
         timer->execute = timer->execute->next;
         timer->execute_count -= 1;
-        //bh_module_timeout_handler(node->handler_name);
+        bh_module_timeout_handler(node->handler_name);
         if (node->times>0 || node->times==-1) {
             node->trigger_time = _get_systime() + node->time;
             node->times = (node->times==-1) ? node->times : (node->times-1);

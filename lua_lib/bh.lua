@@ -1,13 +1,16 @@
 bh_module = {}
 
+bh_module.engine = nil
 bh_module.handler = nil
 bh_module.timeout_handlers = {}
 
-function init(engine, sock_fd)
+function set_engine(engine)
     if (not bh_module["engine"]) then
         bh_module["engine"] = engine
     end
+end
 
+function init(sock_fd)
     local co = coroutine.create(
         function(data)
             while true do

@@ -3,18 +3,26 @@
 
 #include <stdint.h>
 
-typedef struct bh_event {
+typedef struct bh_event_node bh_event_node;
+struct bh_event_node {
     int fd;
     uint32_t read;
     uint32_t write;
-} bh_event;
+};
 
-int  bh_event_create();
-void bh_event_release(int event_fd);
-int  bh_event_add(int event_fd, int sock_fd);
-void bh_event_del(int event_fd, int sock_fd);
-int  bh_event_write(int event_fd, int sock_fd, int enable);
-int  bh_event_poll(int event_fd, bh_event *e, int max, int timeout);
+typedef struct bh_event bh_event;
+struct bh_event {
+    int event_fd;
+    int max_events;
+    bh_event_node *events;
+};
+
+bh_event *  bh_event_create();
+void        bh_event_release(bh_event *event);
+int         bh_event_add(bh_event *event, int sock_fd);
+void        bh_event_del(bh_event *event, int sock_fd);
+int         bh_event_write(bh_event *event, int sock_fd, int enable);
+int         bh_event_poll(bh_event *event, int max, int timeout);
 
 #ifdef __linux__
 #include "bh_epoll.h"
