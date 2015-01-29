@@ -2,7 +2,6 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include <stdlib.h>
-#include <stdarg.h>
 
 #include "bh_module.h"
 
@@ -15,11 +14,10 @@ bh_module *module = NULL;
 void
 bh_module_create() {
     if (module == NULL) {
-        *module = (bh_module *)malloc(sizeof(bh_module));
+        module = (bh_module *)malloc(sizeof(bh_module));
         module->L = luaL_newstate();
         luaL_openlibs(module->L);
     }
-    
 }
 
 void
@@ -29,18 +27,23 @@ bh_module_release() {
     module = NULL;
 }
 
-void
-bh_module_load(int num, ...) {
-    va_list arg_ptr;
-    char *mod_name;
-    int i;
+//void
+//bh_module_load(int num, ...) {
+//    va_list arg_ptr;
+//    char *mod_name;
+//    int i;
+//
+//    va_start(arg_ptr, num);
+//    for (i=0; i<num; i++) {
+//        mod_name = va_arg(arg_ptr, char *);
+//        luaL_dofile(module->L, mod_name);
+//    }
+//    va_end(arg_ptr);
+//}
 
-    va_start(arg_ptr, num);
-    for (i=0; i<num; i++) {
-        mod_name = va_arg(arg_ptr, char *);
-        luaL_dofile(module->L, mod_name);
-    }
-    va_end(arg_ptr);
+void
+bh_module_load(const char *mod_name) {
+    luaL_dofile(module->L, mod_name);
 }
 
 static void
@@ -53,6 +56,42 @@ _set_engine(lua_State *L, bh_engine *engine) {
 void
 bh_module_set_engine(bh_engine *engine) {
     _set_engine(module->L, engine);
+}
+
+static void
+_set_event(lua_State *L, bh_event *event) {
+    lua_getglobal(L, "set_event");
+    lua_pushlightuserdata(L, (void *)event);
+    lua_call(L, 1, 0);
+}
+
+void
+bh_module_set_event(bh_event *event) {
+    _set_event(module->L, event);
+}
+
+static void
+_set_server(lua_State *L, bh_server *server) {
+    lua_getglobal(L, "set_server");
+    lua_pushlightuserdata(L, (void *)server);
+    lua_call(L, 1, 0);
+}
+
+void
+bh_module_set_server(bh_server *server) {
+    _set_server(module->L, server);
+}
+
+static void
+_set_timer(lua_State *L, bh_timer *timer) {
+    lua_getglobal(L, "set_timer");
+    lua_pushlightuserdata(L, (void *)timer);
+    lua_call(L, 1, 0);
+}
+
+void
+bh_module_set_timer(bh_timer *timer) {
+    _set_timer(module->L, timer);
 }
 
 static void
@@ -77,7 +116,7 @@ _recv(lua_State *L, int sock_fd, char *data) {
 
 void
 bh_module_recv(int sock_fd, char *data) {
-    _recv(module->L, engine, sock_fd, data);
+    _recv(module->L, sock_fd, data);
 }
 
 _timeout_handler(lua_State *L, char *handler_name) {

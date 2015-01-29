@@ -80,7 +80,7 @@ bh_string_update_start(bh_string *string, int len) {
     return 0;
 }
 
-void
+int
 bh_string_update_end(bh_string *string, int len) {
     if (len <= 0) return -1;
     string->end += len;

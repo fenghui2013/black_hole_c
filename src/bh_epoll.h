@@ -2,10 +2,11 @@
 #define _BH_EPOLL_H_
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/epoll.h>
 #include <string.h>
 
-bh_event *
+static bh_event *
 bh_event_create() {
     bh_event *event = (bh_event *)malloc(sizeof(bh_event));
     event->event_fd = epoll_create(1024);
@@ -14,14 +15,14 @@ bh_event_create() {
     return event;
 }
 
-void
+static void
 bh_event_release(bh_event *event) {
     free(event->events);
     close(event->event_fd);
     free(event);
 }
 
-int
+static int
 bh_event_add(bh_event *event, int sock_fd) {
     struct epoll_event ev;
     ev.events = EPOLLET | EPOLLIN;
@@ -32,12 +33,12 @@ bh_event_add(bh_event *event, int sock_fd) {
     return 1;
 }
 
-void
+static void
 bh_event_del(bh_event *event, int sock_fd) {
     epoll_ctl(event->event_fd, EPOLL_CTL_DEL, sock_fd, NULL);
 }
 
-int
+static int
 bh_event_write(bh_event *event, int sock_fd, int enable) {
     struct epoll_event ev;
     ev.events = EPOLLET | EPOLLIN | (enable ? EPOLLOUT : 0);
@@ -48,8 +49,8 @@ bh_event_write(bh_event *event, int sock_fd, int enable) {
     return 1;
 }
 
-int
-bh_event_poll(bh_evnet *event, int max, int timeout) {
+static int
+bh_event_poll(bh_event *event, int max, int timeout) {
     struct epoll_event ev[max];
     int i;
     uint32_t flag;

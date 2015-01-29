@@ -1,9 +1,11 @@
 #include <lua.h>
+#include <lualib.h>
 #include <lauxlib.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "bh_server.h"
+#include "bh_event.h"
 
 static int
 _connect(lua_State *L) {
@@ -14,7 +16,19 @@ _connect(lua_State *L) {
 
     bh_server_client_connect(event, server, ip, port);
     
-    return 0;    
+    return 0;
+}
+
+static int
+_send(lua_State *L) {
+    bh_server *server = (bh_server *)lua_touserdata(L, 1);
+    int sock_fd = luaL_checkint(L, 2);
+    char *data = (char *)luaL_checkstring(L, 3);
+    int len = luaL_checkint(L, 4);
+
+    up_to_down(server, sock_fd, data, len);
+
+    return 0;
 }
 
 static int
@@ -32,6 +46,7 @@ int
 luaopen_bh_socket(lua_State *L) {
     luaL_Reg l[] = {
         {"connect", _connect},
+        {"send", _send},
         {"close", _close},
         {NULL, NULL},
     };

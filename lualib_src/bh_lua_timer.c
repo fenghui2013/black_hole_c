@@ -1,4 +1,5 @@
 #include <lua.h>
+#include <lualib.h>
 #include <lauxlib.h>
 
 #include "bh_timer.h"
@@ -11,6 +12,8 @@ _set(lua_State *L) {
     char *handler_name = (char *)luaL_checkstring(L, 4);
     
     bh_timer_set(timer, time, times, handler_name);
+
+    return 0;
 }
 
 int

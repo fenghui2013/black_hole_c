@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "bh_server.h"
 
@@ -43,14 +44,29 @@ bh_server_create() {
 }
 
 void
+bh_server_release(bh_server *server) {
+    free(server->clients);
+    if (server->sock_fd != 0) {
+        bh_socket_close(server->sock_fd);
+    }
+    free(server);
+    server = NULL;
+}
+
+void
 bh_server_listen(bh_event *event, bh_server *server, char *ip, int port) {
+    int res;
+
     server->sock_fd = bh_socket_create();
     server->ip = ip;
     server->port = port;
-    bh_socket_bind(server->sock_fd, server->ip, server->port);
+    printf("sock_fd: %d\n", server->sock_fd);
+    printf("ip: %s\n", server->ip);
+    printf("port: %d\n", server->port);
     bh_socket_nonblocking(server->sock_fd);
+    bh_socket_bind(server->sock_fd, server->ip, server->port);
     bh_socket_listen(server->sock_fd, 1024);
-    bh_event_add(event->event_fd, server->sock_fd);
+    bh_event_add(event, server->sock_fd);
 }
 
 void
@@ -58,6 +74,8 @@ bh_server_client_accept(bh_event *event, bh_server *server) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
     client->sock_fd = bh_socket_accept(server->sock_fd, &client->ip, &client->port);
+    printf("client ip: %s\n", client->ip);
+    printf("client port: %d\n", client->port);
     bh_socket_nonblocking(client->sock_fd);
     client->recv_buffer = bh_buffer_create(1024, 8*1024);
     client->send_buffer = bh_buffer_create(1024, 8*1024);
@@ -73,7 +91,7 @@ bh_server_client_accept(bh_event *event, bh_server *server) {
     }
     server->clients->clients_count += 1;
     bh_module_init(client->sock_fd);
-    bh_event_add(event->event_fd, client->sock_fd);
+    bh_event_add(event, client->sock_fd);
 }
 
 void
@@ -99,7 +117,7 @@ bh_server_client_connect(bh_event *event, bh_server *server, char *ip, int port)
     }
     server->clients->clients_count += 1;
     bh_module_init(client->sock_fd);
-    bh_event_add(event->event_fd, client->sock_fd);
+    bh_event_add(event, client->sock_fd);
 }
 
 static bh_client *
@@ -131,8 +149,8 @@ bh_server_client_close(bh_event *event, bh_server *server, int sock_fd) {
         client->prev->next = client->next;
         client->next->prev = client->prev;
     }
-    server->clients->client_count -= 1;
-    bh_event_del(event->event_fd, sock_fd);
+    server->clients->clients_count -= 1;
+    bh_event_del(event, sock_fd);
     bh_buffer_release(client->recv_buffer);
     bh_buffer_release(client->send_buffer);
     bh_socket_close(client->sock_fd);
@@ -184,7 +202,7 @@ bh_server_write(bh_server *server, int sock_fd) {
     while (1) {
         size = bh_buffer_get_read(client->send_buffer, buffer);
         if (size == 0) return 0;
-        res = bh_socket_send(sock_fd, buffer);
+        res = bh_socket_send(sock_fd, buffer, size);
         switch(res) {
             case -2:
                 // again
@@ -200,7 +218,23 @@ bh_server_write(bh_server *server, int sock_fd) {
 }
 
 void
-send_to_application_layer(bh_server *server, int sock_fd) {
+up_to_down(bh_server *server, int sock_fd, char *data, int len) {
+    bh_client *client = _find(server, sock_fd);
+    char *buffer;
+    int size, i, j = 0;
+
+    while (1) {
+        size = bh_buffer_get_write(client->send_buffer, buffer);
+        for (i=0; i<size, j<len; i++, j++) {
+            buffer[i] = data[j];
+        }
+        bh_buffer_set_write(client->send_buffer, i);
+        if (j == len) break;
+    }
+}
+
+void
+down_to_up(bh_server *server, int sock_fd) {
     bh_client *client = _find(server, sock_fd);
     char *buffer;
     int size;
@@ -219,18 +253,18 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
     
     while (1) {
         timeout = bh_timer_get(timer);
-        events_num = bh_event_poll(event->event_fd, event->events, event->max_events, timeout);
+        events_num = bh_event_poll(event, event->max_events, timeout);
         for (i=0; i<events_num; i++) {
-            f (event->events[i].fd == server->sock_fd) {
+            if (event->events[i].fd == server->sock_fd) {
                 // accept new client
-                bh_server_accept_client(event, server);
+                bh_server_client_accept(event, server);
             } else {
                 if (event->events[i].read) {
                     res = bh_server_read(server, event->events[i].fd);
                     if (res == 1) {
-                        send_to_application_layer(server, event->events[i].fd);
+                        down_to_up(server, event->events[i].fd);
                     } else if (res == 0 || res == -1) {
-                        bh_server_close_client(server, event->events[i].fd);
+                        bh_server_client_close(event, server, event->events[i].fd);
                         bh_module_recv(event->events[i].fd, "");
                     }
                 }
@@ -243,7 +277,7 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
                     }
                     // write data error
                     if (res == -1) {
-                        bh_server_close_client(server, event->events[i].fd);
+                        bh_server_client_close(event, server, event->events[i].fd);
                     }
                 }
             }

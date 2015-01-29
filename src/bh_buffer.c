@@ -3,6 +3,7 @@
 #include "bh_string.h"
 #include "bh_buffer.h"
 
+typedef struct bh_buffer_node bh_buffer_node;
 struct bh_buffer_node {
     bh_string *string;
     bh_buffer_node *next;
@@ -142,6 +143,8 @@ bh_buffer_get_size(bh_buffer *buffer) {
         size += bh_string_get_size(node->string);
         node = node->next;
     }
+
+    return size;
 }
 
 int

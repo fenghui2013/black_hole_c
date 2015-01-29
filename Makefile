@@ -1,4 +1,4 @@
-BLACK_HOLE_BUILD_PATH ?= .
+BLACKHOLE_BUILD_PATH ?= .
 
 CC = gcc
 
@@ -9,18 +9,28 @@ CFLAGS := -O2 -Wall
 SHARED := -fPIC --shared
 
 LUA_CLIB_PATH ?= lualib_c
-LUA_CLIB = bh_socket
+LUA_CLIB = bh_server bh_timer
+
+SRC = bh_main.c bh_buffer.c bh_engine.c bh_module.c bh_server.c bh_socket.c \
+	  bh_string.c bh_timer.c
 
 all: \
+	$(BLACKHOLE_BUILD_PATH)/blackhole \
 	$(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so)
+
+$(BLACKHOLE_BUILD_PATH)/blackhole: $(foreach v, $(SRC), src/$(v))
+	$(CC) $(CFLAGS) -o $@ $^ -Isrc $(LUA_INC) $(LUA_FLAGS)
 
 $(LUA_CLIB_PATH):
 	mkdir $(LUA_CLIB_PATH)
 
-$(LUA_CLIB_PATH)/bh_socket.so: src/bh_socket.c src/bh_socket_lua.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ $(LUA_INC) $(LUA_FLAGS)
+$(LUA_CLIB_PATH)/bh_server.so : src/bh_buffer.c src/bh_socket.c src/bh_engine.c src/bh_timer.c src/bh_server.c \
+	lualib_src/bh_lua_socket.c | $(LUA_CLIB_PATH)
+	$(CC) $(CFLAGS) $(SHARED) -o $@ $^ -Isrc $(LUA_INC) $(LUA_FLAGS)
+
+$(LUA_CLIB_PATH)/bh_timer.so : src/bh_module.c src/bh_timer.c \
+	lualib_src/bh_lua_timer.c | $(LUA_CLIB_PATH)
+	$(CC) $(CFLAGS) $(SHARED) -o $@ $^ -Isrc $(LUA_INC) $(LUA_FLAGS)
 
 clean:
-	rm -rf $(LUA_CLIB_PATH)/*.so
-cleanall:
-	rm -rf $(LUA_CLIB_PATH)
+	rm -rf $(BLACKHOLE_BUILD_PATH)/blackhole $(LUA_CLIB_PATH)/*.so

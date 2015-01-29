@@ -13,15 +13,19 @@ struct bh_engine {
 };
 
 bh_engine *
-bh_engine_create(int num, ...) {
+bh_engine_create() {
     bh_engine *engine = (bh_engine *)malloc(sizeof(bh_engine));
 
     engine->event = bh_event_create();
     engine->server = bh_server_create();
     engine->timer = bh_timer_create();
     bh_module_create();
-    bh_module_load(num, ...);
+    //bh_module_load(num, ...);
+    bh_module_load("./lualib/bh.lua");
     bh_module_set_engine(engine);
+    bh_module_set_event(engine->event);
+    bh_module_set_server(engine->server);
+    bh_module_set_timer(engine->timer);
     return engine;
 }
 

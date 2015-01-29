@@ -17,12 +17,12 @@ struct bh_event {
     bh_event_node *events;
 };
 
-bh_event *  bh_event_create();
-void        bh_event_release(bh_event *event);
-int         bh_event_add(bh_event *event, int sock_fd);
-void        bh_event_del(bh_event *event, int sock_fd);
-int         bh_event_write(bh_event *event, int sock_fd, int enable);
-int         bh_event_poll(bh_event *event, int max, int timeout);
+//static bh_event *  bh_event_create();
+//static void        bh_event_release(bh_event *event);
+//static int         bh_event_add(bh_event *event, int sock_fd);
+//static void        bh_event_del(bh_event *event, int sock_fd);
+//static int         bh_event_write(bh_event *event, int sock_fd, int enable);
+//static int         bh_event_poll(bh_event *event, int max, int timeout);
 
 #ifdef __linux__
 #include "bh_epoll.h"

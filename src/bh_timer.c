@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <sys/time.h>
 
 #include "bh_module.h"
 #include "bh_timer.h"
@@ -71,9 +72,9 @@ _search(bh_timer_node *common, uint64_t trigger_time) {
 
 static uint64_t
 _get_systime() {
-    struct timeval ev;
+    struct timeval tv;
 
-    gettimeofday(&ev, NULL);
+    gettimeofday(&tv, NULL);
 
     return (uint64_t)tv.tv_sec*1000 + (uint64_t)tv.tv_usec/1000;
 }
