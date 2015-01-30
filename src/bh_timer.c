@@ -111,12 +111,13 @@ bh_timer_set(bh_timer *timer, int time, int times, char *handler_name) {
 int
 bh_timer_get(bh_timer *timer) {
     bh_timer_node *node;
+    int time_interval = 0;
 
     if (timer->execute != NULL) {
-        return (int)(timer->execute->trigger_time-_get_systime());
+        goto bh_timer_get_end;
     }
     timer->execute = timer->common;
-    node = timer->common;
+    node = timer->execute;
     while (node) {
         timer->execute_count += 1;
         timer->common_count -= 1;
@@ -134,7 +135,11 @@ bh_timer_get(bh_timer *timer) {
     if (timer->execute_count == 0) {
         return -1;
     }
-    return (int)(timer->execute->trigger_time-_get_systime());
+    goto bh_timer_get_end;
+
+bh_timer_get_end:
+    time_interval = (int)(timer->execute->trigger_time-_get_systime());
+    return (time_interval<0) ? 0 : time_interval;
 }
 
 void
@@ -150,9 +155,9 @@ bh_timer_execute(bh_timer *timer) {
         timer->execute = timer->execute->next;
         timer->execute_count -= 1;
         bh_module_timeout_handler(node->handler_name);
+        node->times = (node->times==-1) ? node->times : (node->times-1);
         if (node->times>0 || node->times==-1) {
             node->trigger_time = _get_systime() + node->time;
-            node->times = (node->times==-1) ? node->times : (node->times-1);
             _bh_timer_set(timer, node);
         } else {
             free(node);

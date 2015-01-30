@@ -2,6 +2,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "bh_module.h"
 
@@ -9,7 +10,7 @@ struct bh_module {
     lua_State *L;
 };
 
-bh_module *module = NULL;
+static bh_module *module = NULL;
 
 void
 bh_module_create() {
@@ -43,7 +44,10 @@ bh_module_release() {
 
 void
 bh_module_load(const char *mod_name) {
-    luaL_dofile(module->L, mod_name);
+    //luaL_dofile(module->L, mod_name);
+    luaL_loadfile(module->L, mod_name);
+    lua_pcall(module->L, 0, LUA_MULTRET, 0);
+    printf("load module: %s\n", mod_name);
 }
 
 static void
@@ -107,18 +111,20 @@ bh_module_init(int sock_fd) {
 }
 
 static void
-_recv(lua_State *L, int sock_fd, char *data) {
+_recv(lua_State *L, int sock_fd, char *data, int len) {
     lua_getglobal(L, "recv");
     lua_pushinteger(L, sock_fd);
-    lua_pushstring(L, data);
-    lua_call(L, 2, 0);
+    lua_pushlstring(L, data, len);
+    lua_pushinteger(L, len);
+    lua_call(L, 3, 0);
 }
 
 void
-bh_module_recv(int sock_fd, char *data) {
-    _recv(module->L, sock_fd, data);
+bh_module_recv(int sock_fd, char *data, int len) {
+    _recv(module->L, sock_fd, data, len);
 }
 
+void
 _timeout_handler(lua_State *L, char *handler_name) {
     lua_getglobal(L, "timeout_handler");
     lua_pushstring(L, handler_name);

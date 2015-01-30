@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "bh_module.h"
 #include "bh_server.h"
 
 typedef struct bh_client bh_client;
@@ -55,8 +56,6 @@ bh_server_release(bh_server *server) {
 
 void
 bh_server_listen(bh_event *event, bh_server *server, char *ip, int port) {
-    int res;
-
     server->sock_fd = bh_socket_create();
     server->ip = ip;
     server->port = port;
@@ -74,8 +73,7 @@ bh_server_client_accept(bh_event *event, bh_server *server) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
     client->sock_fd = bh_socket_accept(server->sock_fd, &client->ip, &client->port);
-    printf("client ip: %s\n", client->ip);
-    printf("client port: %d\n", client->port);
+    printf("new client ip: %s, port: %d, fd:%d\n", client->ip, client->port, client->sock_fd);
     bh_socket_nonblocking(client->sock_fd);
     client->recv_buffer = bh_buffer_create(1024, 8*1024);
     client->send_buffer = bh_buffer_create(1024, 8*1024);
@@ -94,7 +92,7 @@ bh_server_client_accept(bh_event *event, bh_server *server) {
     bh_event_add(event, client->sock_fd);
 }
 
-void
+int
 bh_server_client_connect(bh_event *event, bh_server *server, char *ip, int port) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
@@ -118,6 +116,8 @@ bh_server_client_connect(bh_event *event, bh_server *server, char *ip, int port)
     server->clients->clients_count += 1;
     bh_module_init(client->sock_fd);
     bh_event_add(event, client->sock_fd);
+
+    return client->sock_fd;
 }
 
 static bh_client *
@@ -135,6 +135,7 @@ _find(bh_server *server, int sock_fd) {
 void
 bh_server_client_close(bh_event *event, bh_server *server, int sock_fd) {
     bh_client *client = _find(server, sock_fd);
+    printf("close client ip: %s, port: %d\n", client->ip, client->port);
 
     if (client->prev==NULL && client->next==NULL) {
         server->clients->first = NULL;
@@ -166,83 +167,85 @@ bh_server_client_close(bh_event *event, bh_server *server, int sock_fd) {
 int
 bh_server_read(bh_server *server, int sock_fd) {
     bh_client *client = _find(server, sock_fd);
-    char *buffer;
+    char *buffer = NULL;
     int res, size;
 
+    printf("bh_server_read, sock_fd: %d\n", sock_fd);
     while (1) {
-        size = bh_buffer_get_write(client->recv_buffer, buffer);
+        size = bh_buffer_get_write(client->recv_buffer, &buffer);
+        printf("bh_server_read, size: %d\n", size);
         res = bh_socket_recv(sock_fd, &buffer, size);
-        switch (res) {
-            case -2:
-                // again
-                break;
-            case -1:
-                // error close
-                return -1;
-            case 0:
-                // normal close
-                return 0;
-            default:
-                bh_buffer_set_write(client->recv_buffer, res);
-        }
+        printf("bh_socket_recv: %d\n", res);
+        if (res == -2) break;     // again
+        if (res == -1) return -1; // error close
+        if (res == 0) return 0;   // normal close
+        bh_buffer_set_write(client->recv_buffer, res);
     }
     return 1;
 }
 
 /*
- * 1, normal
+ * 0, data wirte done
+ * 1, again
  * -1, error
  */
 int
 bh_server_write(bh_server *server, int sock_fd) {
     bh_client *client = _find(server, sock_fd);
-    char *buffer;
+    char *buffer = NULL;
     int res, size;
 
     while (1) {
-        size = bh_buffer_get_read(client->send_buffer, buffer);
+        size = bh_buffer_get_read(client->send_buffer, &buffer);
         if (size == 0) return 0;
         res = bh_socket_send(sock_fd, buffer, size);
-        switch(res) {
-            case -2:
-                // again
-                break;
-            case -1:
-                // error
-                return -1;
-            default:
-                bh_buffer_set_read(client->send_buffer, res);
-        }
+        if (res == -2) break;
+        if (res == -1) return -1;
+        bh_buffer_set_read(client->send_buffer, res);
+        //switch(res) {
+        //    case -2:
+        //        // again
+        //        break;
+        //    case -1:
+        //        // error
+        //        return -1;
+        //    default:
+        //        bh_buffer_set_read(client->send_buffer, res);
+        //}
     }
     return 1;
 }
 
 void
-up_to_down(bh_server *server, int sock_fd, char *data, int len) {
+up_to_down(bh_event *event, bh_server *server, int sock_fd, char *data, int len) {
     bh_client *client = _find(server, sock_fd);
-    char *buffer;
+    char *buffer = NULL;
     int size, i, j = 0;
 
+    printf("up_to_down--------------------%d\n", len);
     while (1) {
-        size = bh_buffer_get_write(client->send_buffer, buffer);
-        for (i=0; i<size, j<len; i++, j++) {
+        size = bh_buffer_get_write(client->send_buffer, &buffer);
+        for (i=0; i<size && j<len; i++, j++) {
             buffer[i] = data[j];
         }
         bh_buffer_set_write(client->send_buffer, i);
+        printf("%d\n", j);
         if (j == len) break;
     }
+    bh_event_write(event, sock_fd, 1);
 }
 
 void
 down_to_up(bh_server *server, int sock_fd) {
     bh_client *client = _find(server, sock_fd);
-    char *buffer;
+    char *buffer = NULL;
     int size;
 
     while (1) {
-        size = bh_buffer_get_read(client->send_buffer, buffer);
+        size = bh_buffer_get_read(client->recv_buffer, &buffer);
+        printf("down_to_up size: %d\n", size);
         if (size == 0) break;
-        bh_module_recv(sock_fd, buffer);
+        bh_module_recv(sock_fd, buffer, size);
         bh_buffer_set_read(client->recv_buffer, size);
     }
 }
@@ -253,6 +256,7 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
     
     while (1) {
         timeout = bh_timer_get(timer);
+        printf("timeout: %d\n", timeout);
         events_num = bh_event_poll(event, event->max_events, timeout);
         for (i=0; i<events_num; i++) {
             if (event->events[i].fd == server->sock_fd) {
@@ -260,20 +264,22 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
                 bh_server_client_accept(event, server);
             } else {
                 if (event->events[i].read) {
+                    printf("read event\n");
                     res = bh_server_read(server, event->events[i].fd);
                     if (res == 1) {
                         down_to_up(server, event->events[i].fd);
                     } else if (res == 0 || res == -1) {
+                        bh_module_recv(event->events[i].fd, "", 0);
                         bh_server_client_close(event, server, event->events[i].fd);
-                        bh_module_recv(event->events[i].fd, "");
                     }
                 }
 
                 if (event->events[i].write) {
+                    printf("write event\n");
                     res = bh_server_write(server, event->events[i].fd);
                     // write data done
                     if (res == 0) {
-                        bh_event_del(event, event->events[i].fd);
+                        bh_event_write(event, event->events[i].fd, 0);
                     }
                     // write data error
                     if (res == -1) {

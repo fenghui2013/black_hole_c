@@ -6,7 +6,7 @@
 #include <sys/epoll.h>
 #include <string.h>
 
-static bh_event *
+static inline bh_event *
 bh_event_create() {
     bh_event *event = (bh_event *)malloc(sizeof(bh_event));
     event->event_fd = epoll_create(1024);
@@ -15,14 +15,14 @@ bh_event_create() {
     return event;
 }
 
-static void
+static inline void
 bh_event_release(bh_event *event) {
     free(event->events);
     close(event->event_fd);
     free(event);
 }
 
-static int
+static inline int
 bh_event_add(bh_event *event, int sock_fd) {
     struct epoll_event ev;
     ev.events = EPOLLET | EPOLLIN;
@@ -33,12 +33,12 @@ bh_event_add(bh_event *event, int sock_fd) {
     return 1;
 }
 
-static void
+static inline void
 bh_event_del(bh_event *event, int sock_fd) {
     epoll_ctl(event->event_fd, EPOLL_CTL_DEL, sock_fd, NULL);
 }
 
-static int
+static inline int
 bh_event_write(bh_event *event, int sock_fd, int enable) {
     struct epoll_event ev;
     ev.events = EPOLLET | EPOLLIN | (enable ? EPOLLOUT : 0);
@@ -49,7 +49,7 @@ bh_event_write(bh_event *event, int sock_fd, int enable) {
     return 1;
 }
 
-static int
+static inline int
 bh_event_poll(bh_event *event, int max, int timeout) {
     struct epoll_event ev[max];
     int i;

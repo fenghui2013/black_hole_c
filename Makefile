@@ -24,13 +24,13 @@ $(BLACKHOLE_BUILD_PATH)/blackhole: $(foreach v, $(SRC), src/$(v))
 $(LUA_CLIB_PATH):
 	mkdir $(LUA_CLIB_PATH)
 
-$(LUA_CLIB_PATH)/bh_server.so : src/bh_buffer.c src/bh_socket.c src/bh_engine.c src/bh_timer.c src/bh_server.c \
-	lualib_src/bh_lua_socket.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/bh_server.so: src/bh_buffer.c src/bh_string.c src/bh_socket.c src/bh_module.c src/bh_timer.c src/bh_server.c \
+	lualib_src/bh_lua_server.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -o $@ $^ -Isrc $(LUA_INC) $(LUA_FLAGS)
 
-$(LUA_CLIB_PATH)/bh_timer.so : src/bh_module.c src/bh_timer.c \
+$(LUA_CLIB_PATH)/bh_timer.so: src/bh_module.c src/bh_timer.c \
 	lualib_src/bh_lua_timer.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -o $@ $^ -Isrc $(LUA_INC) $(LUA_FLAGS)
 
 clean:
-	rm -rf $(BLACKHOLE_BUILD_PATH)/blackhole $(LUA_CLIB_PATH)/*.so
+	rm -rf $(BLACKHOLE_BUILD_PATH)/blackhole $(LUA_CLIB_PATH)

@@ -13,7 +13,7 @@ void        bh_module_release();
 //void        bh_module_load(int num, ...);
 void        bh_module_load(const char *mod_name);
 void        bh_module_init(int sock_fd);
-void        bh_module_recv(int sock_fd, char *data);
+void        bh_module_recv(int sock_fd, char *data, int len);
 
 void        bh_module_timeout_handler(char *handler_name);
 void        bh_module_set_engine(bh_engine *engine);

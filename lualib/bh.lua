@@ -1,10 +1,9 @@
 bh = {}
-
-bh.engine = nil
-bh.event = nil
-bh.server = nil
-bh.timer = nil
-bh.handler = nil
+--bh.engine = nil
+--bh.event = nil
+--bh.server = nil
+--bh.timer = nil
+--bh.handler = nil
 bh.timeout_handlers = {}
 
 function set_engine(engine)
@@ -33,13 +32,13 @@ end
 
 function init(sock_fd)
     local co = coroutine.create(
-        function(data)
+        function(fd, data, len)
             while true do
                 if data == "" then
                     break
                 end
-                bh.handler(data)
-                data = coroutine.yield()
+                bh.handler(fd, data, len)
+                fd, data, len = coroutine.yield()
             end
             bh[sock_fd] = nil
         end
@@ -47,8 +46,8 @@ function init(sock_fd)
     bh[sock_fd] = co
 end
 
-function recv(sock_fd, data)
-    coroutine.resume(bh[sock_fd], data)
+function recv(sock_fd, data, len)
+    coroutine.resume(bh[sock_fd], sock_fd, data, len)
 end
 
 function timeout_handler(handler_name)

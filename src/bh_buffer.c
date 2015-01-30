@@ -73,7 +73,7 @@ bh_buffer_release(bh_buffer *buffer) {
 }
 
 int
-bh_buffer_get_write(bh_buffer *buffer, char *s) {
+bh_buffer_get_write(bh_buffer *buffer, char **s) {
     int free = bh_string_get_free(buffer->current_write->string);
     int is_expansion = 1;
 
@@ -81,6 +81,7 @@ bh_buffer_get_write(bh_buffer *buffer, char *s) {
         is_expansion = bh_string_expansion(buffer->current_write->string, buffer->max_size);
     }
 
+    // expansion failed
     if (is_expansion == 0) {
         if (buffer->free_count > 0) {
             buffer->current_write = buffer->first;
@@ -96,13 +97,21 @@ bh_buffer_get_write(bh_buffer *buffer, char *s) {
         buffer->last->next = NULL;
         free = bh_string_get_free(buffer->current_write->string);
     }
-    s = bh_string_get(buffer->current_write->string);
+    *s = bh_string_get_end(buffer->current_write->string);
     return free;
 }
 
 void
 bh_buffer_set_write(bh_buffer *buffer, int len) {
     bh_string_update_end(buffer->current_write->string, len);
+}
+
+int
+bh_buffer_get_read(bh_buffer *buffer, char **s) {
+    int len = bh_string_get_len(buffer->current_read->string);
+    *s = bh_string_get_start(buffer->current_read->string);
+
+    return len;
 }
 
 void
@@ -114,14 +123,6 @@ bh_buffer_set_read(bh_buffer *buffer, int len) {
             buffer->free_count += 1;
         }
     }
-}
-
-int
-bh_buffer_get_read(bh_buffer *buffer, char *s) {
-    int len = bh_string_get_len(buffer->current_read->string);
-    s = bh_string_get(buffer->current_read->string);
-
-    return len;
 }
 
 int

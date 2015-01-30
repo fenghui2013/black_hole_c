@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "bh_string.h"
 
@@ -50,7 +51,7 @@ bh_string_expansion(bh_string *string, int max_size) {
     new_size = 2*string->size;
     new_s = (char *)malloc((new_size+2)*sizeof(char));
 
-    for (i=1, j=string->start; j<=string->end; i++, j++) {
+    for (i=1, j=string->start; j<string->end; i++, j++) {
         new_s[i] = string->s[j];
     }
     free(string->s);
@@ -58,7 +59,7 @@ bh_string_expansion(bh_string *string, int max_size) {
     string->size = new_size;
     string->start = 1;
     string->end = i-1;
-    string->free = string->size-string->end;
+    string->free = string->size-string->end+1;
     return 1;
 }
 
@@ -77,19 +78,31 @@ bh_string_update_start(bh_string *string, int len) {
         string->end = 1;
         return 1;
     }
+
     return 0;
 }
 
+/*
+ * -1, argument len invalid
+ * 0, normal
+ */
 int
 bh_string_update_end(bh_string *string, int len) {
     if (len <= 0) return -1;
     string->end += len;
-    string->free = string->size-string->end;
+    string->free = string->size-string->end+1;
+
+    return 0;
 }
 
 char *
-bh_string_get(bh_string *string) {
+bh_string_get_start(bh_string *string) {
     return string->s+string->start;
+}
+
+char *
+bh_string_get_end(bh_string *string) {
+    return string->s+string->end;
 }
 
 int
@@ -99,7 +112,8 @@ bh_string_get_size(bh_string *string) {
 
 int
 bh_string_get_len(bh_string *string) {
-    return string->end - string->start + 1;
+    printf("bh_string_get_len start: %d, end:%d\n", string->start, string->end);
+    return string->end-string->start;
 }
 
 int
