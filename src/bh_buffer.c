@@ -79,6 +79,7 @@ bh_buffer_get_write(bh_buffer *buffer, char **s) {
 
     if (free == 0) {
         is_expansion = bh_string_expansion(buffer->current_write->string, buffer->max_size);
+        free = bh_string_get_free(buffer->current_write->string);
     }
 
     // expansion failed

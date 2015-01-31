@@ -28,7 +28,6 @@ _send(lua_State *L) {
     char *data = (char *)luaL_checkstring(L, 4);
     int len = luaL_checkint(L, 5);
     
-    printf("_send======================\n");
     up_to_down(event, server, sock_fd, data, len);
 
     return 0;

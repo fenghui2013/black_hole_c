@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "bh_string.h"
 
@@ -58,7 +57,7 @@ bh_string_expansion(bh_string *string, int max_size) {
     string->s = new_s;
     string->size = new_size;
     string->start = 1;
-    string->end = i-1;
+    string->end = i;
     string->free = string->size-string->end+1;
     return 1;
 }
@@ -112,7 +111,6 @@ bh_string_get_size(bh_string *string) {
 
 int
 bh_string_get_len(bh_string *string) {
-    printf("bh_string_get_len start: %d, end:%d\n", string->start, string->end);
     return string->end-string->start;
 }
 

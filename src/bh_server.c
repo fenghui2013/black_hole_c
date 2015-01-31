@@ -135,6 +135,7 @@ _find(bh_server *server, int sock_fd) {
 void
 bh_server_client_close(bh_event *event, bh_server *server, int sock_fd) {
     bh_client *client = _find(server, sock_fd);
+    if (client == NULL) return;
     printf("close client ip: %s, port: %d\n", client->ip, client->port);
 
     if (client->prev==NULL && client->next==NULL) {
@@ -170,12 +171,10 @@ bh_server_read(bh_server *server, int sock_fd) {
     char *buffer = NULL;
     int res, size;
 
-    printf("bh_server_read, sock_fd: %d\n", sock_fd);
+    if (client == NULL) return -1;
     while (1) {
         size = bh_buffer_get_write(client->recv_buffer, &buffer);
-        printf("bh_server_read, size: %d\n", size);
         res = bh_socket_recv(sock_fd, &buffer, size);
-        printf("bh_socket_recv: %d\n", res);
         if (res == -2) break;     // again
         if (res == -1) return -1; // error close
         if (res == 0) return 0;   // normal close
@@ -195,6 +194,7 @@ bh_server_write(bh_server *server, int sock_fd) {
     char *buffer = NULL;
     int res, size;
 
+    if (client == NULL) return -1;
     while (1) {
         size = bh_buffer_get_read(client->send_buffer, &buffer);
         if (size == 0) return 0;
@@ -222,14 +222,13 @@ up_to_down(bh_event *event, bh_server *server, int sock_fd, char *data, int len)
     char *buffer = NULL;
     int size, i, j = 0;
 
-    printf("up_to_down--------------------%d\n", len);
+    if (client == NULL) return;
     while (1) {
         size = bh_buffer_get_write(client->send_buffer, &buffer);
         for (i=0; i<size && j<len; i++, j++) {
             buffer[i] = data[j];
         }
         bh_buffer_set_write(client->send_buffer, i);
-        printf("%d\n", j);
         if (j == len) break;
     }
     bh_event_write(event, sock_fd, 1);
@@ -241,9 +240,9 @@ down_to_up(bh_server *server, int sock_fd) {
     char *buffer = NULL;
     int size;
 
+    if (client == NULL) return;
     while (1) {
         size = bh_buffer_get_read(client->recv_buffer, &buffer);
-        printf("down_to_up size: %d\n", size);
         if (size == 0) break;
         bh_module_recv(sock_fd, buffer, size);
         bh_buffer_set_read(client->recv_buffer, size);
@@ -256,7 +255,6 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
     
     while (1) {
         timeout = bh_timer_get(timer);
-        printf("timeout: %d\n", timeout);
         events_num = bh_event_poll(event, event->max_events, timeout);
         for (i=0; i<events_num; i++) {
             if (event->events[i].fd == server->sock_fd) {
@@ -264,7 +262,6 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
                 bh_server_client_accept(event, server);
             } else {
                 if (event->events[i].read) {
-                    printf("read event\n");
                     res = bh_server_read(server, event->events[i].fd);
                     if (res == 1) {
                         down_to_up(server, event->events[i].fd);
@@ -275,7 +272,6 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
                 }
 
                 if (event->events[i].write) {
-                    printf("write event\n");
                     res = bh_server_write(server, event->events[i].fd);
                     // write data done
                     if (res == 0) {

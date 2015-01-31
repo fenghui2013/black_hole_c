@@ -7,7 +7,6 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "bh_socket.h"
 
@@ -138,7 +137,6 @@ bh_socket_recv(int sock_fd, char **buffer, int size) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return -2;
         }
-        printf("%s\n", strerror(errno));
         return -1;
     }
     return n;
