@@ -2,6 +2,11 @@
 #include <stdio.h>
 
 #include "bh_module.h"
+#include "bh_event.h"
+#include "bh_buffer.h"
+#include "bh_socket.h"
+#include "bh_engine.h"
+#include "bh_timer.h"
 #include "bh_server.h"
 
 typedef struct bh_client bh_client;
@@ -69,7 +74,7 @@ bh_server_listen(bh_event *event, bh_server *server, char *ip, int port) {
 }
 
 void
-bh_server_client_accept(bh_event *event, bh_server *server) {
+bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
     client->sock_fd = bh_socket_accept(server->sock_fd, &client->ip, &client->port);
@@ -88,19 +93,21 @@ bh_server_client_accept(bh_event *event, bh_server *server) {
         server->clients->last = client;
     }
     server->clients->clients_count += 1;
-    bh_module_init(client->sock_fd);
+    bh_module_init(module, client->sock_fd);
     bh_event_add(event, client->sock_fd);
 }
 
 int
-bh_server_client_connect(bh_event *event, bh_server *server, char *ip, int port) {
+bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, const char *ip, int port) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
     client->sock_fd = bh_socket_create();
-    client->ip = ip;
+    client->ip = (char *)ip;
     client->port = port;
-    bh_socket_connect(client->sock_fd, client->ip, client->port);
     bh_socket_nonblocking(client->sock_fd);
+    printf("before bh_socket_connect\n");
+    bh_socket_connect(client->sock_fd, client->ip, client->port);
+    printf("after bh_socket_connect\n");
     client->recv_buffer = bh_buffer_create(1024, 8*1024);
     client->send_buffer = bh_buffer_create(1024, 8*1024);
     client->next = NULL;
@@ -114,7 +121,9 @@ bh_server_client_connect(bh_event *event, bh_server *server, char *ip, int port)
         server->clients->last = client;
     }
     server->clients->clients_count += 1;
-    bh_module_init(client->sock_fd);
+    printf("sock_fd: %d, clients_count: %d\n", client->sock_fd, server->clients->clients_count);
+    bh_module_init(module, client->sock_fd);
+    printf("hello world\n");
     bh_event_add(event, client->sock_fd);
 
     return client->sock_fd;
@@ -235,7 +244,7 @@ up_to_down(bh_event *event, bh_server *server, int sock_fd, char *data, int len)
 }
 
 void
-down_to_up(bh_server *server, int sock_fd) {
+down_to_up(bh_module *module, bh_server *server, int sock_fd) {
     bh_client *client = _find(server, sock_fd);
     char *buffer = NULL;
     int size;
@@ -244,13 +253,13 @@ down_to_up(bh_server *server, int sock_fd) {
     while (1) {
         size = bh_buffer_get_read(client->recv_buffer, &buffer);
         if (size == 0) break;
-        bh_module_recv(sock_fd, buffer, size);
+        bh_module_recv(module, sock_fd, buffer, size);
         bh_buffer_set_read(client->recv_buffer, size);
     }
 }
 
 void
-bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
+bh_server_run(bh_module *module, bh_event *event, bh_server *server, bh_timer *timer) {
     int events_num = 0, i, res, timeout;
     
     while (1) {
@@ -259,14 +268,14 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
         for (i=0; i<events_num; i++) {
             if (event->events[i].fd == server->sock_fd) {
                 // accept new client
-                bh_server_client_accept(event, server);
+                bh_server_client_accept(module, event, server);
             } else {
                 if (event->events[i].read) {
                     res = bh_server_read(server, event->events[i].fd);
                     if (res == 1) {
-                        down_to_up(server, event->events[i].fd);
+                        down_to_up(module, server, event->events[i].fd);
                     } else if (res == 0 || res == -1) {
-                        bh_module_recv(event->events[i].fd, "", 0);
+                        bh_module_recv(module, event->events[i].fd, "", 0);
                         bh_server_client_close(event, server, event->events[i].fd);
                     }
                 }
@@ -284,6 +293,6 @@ bh_server_run(bh_event *event, bh_server *server, bh_timer *timer) {
                 }
             }
         }
-        bh_timer_execute(timer);
+        bh_timer_execute(module, timer);
     }
 }

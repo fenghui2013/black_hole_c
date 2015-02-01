@@ -4,25 +4,34 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "bh_event.h"
+#include "bh_timer.h"
+#include "bh_engine.h"
+#include "bh_server.h"
 #include "bh_module.h"
 
 struct bh_module {
     lua_State *L;
 };
 
-static bh_module *module = NULL;
+//bh_module *_module = NULL;
 
-void
+bh_module *
 bh_module_create() {
-    if (module == NULL) {
-        module = (bh_module *)malloc(sizeof(bh_module));
-        module->L = luaL_newstate();
-        luaL_openlibs(module->L);
-    }
+    //if (_module == NULL) {
+    //    _module = (bh_module *)malloc(sizeof(bh_module));
+    //    _module->L = luaL_newstate();
+    //    luaL_openlibs(_module->L);
+    //}
+    //return _module;
+    bh_module *module = (bh_module *)malloc(sizeof(bh_module));
+    module->L = luaL_newstate();
+    luaL_openlibs(module->L);
+    return module;
 }
 
 void
-bh_module_release() {
+bh_module_release(bh_module *module) {
     lua_close(module->L);
     free(module);
     module = NULL;
@@ -43,11 +52,24 @@ bh_module_release() {
 //}
 
 void
-bh_module_load(const char *mod_name) {
+bh_module_load(bh_module *module, const char *mod_name) {
+    int res;
     //luaL_dofile(module->L, mod_name);
     luaL_loadfile(module->L, mod_name);
-    lua_pcall(module->L, 0, LUA_MULTRET, 0);
-    printf("load module: %s\n", mod_name);
+    res = lua_pcall(module->L, 0, LUA_MULTRET, 0);
+    printf("load module: %s, res: %d\n", mod_name, res);
+}
+
+static void
+_set_module(lua_State *L, bh_module *module) {
+    lua_getglobal(L, "set_module");
+    lua_pushlightuserdata(L, (void *)module);
+    lua_call(L, 1, 0);
+}
+
+void
+bh_module_set_module(bh_module *module) {
+    _set_module(module->L, module);
 }
 
 static void
@@ -58,7 +80,7 @@ _set_engine(lua_State *L, bh_engine *engine) {
 }
 
 void
-bh_module_set_engine(bh_engine *engine) {
+bh_module_set_engine(bh_module *module, bh_engine *engine) {
     _set_engine(module->L, engine);
 }
 
@@ -70,7 +92,7 @@ _set_event(lua_State *L, bh_event *event) {
 }
 
 void
-bh_module_set_event(bh_event *event) {
+bh_module_set_event(bh_module *module, bh_event *event) {
     _set_event(module->L, event);
 }
 
@@ -82,7 +104,7 @@ _set_server(lua_State *L, bh_server *server) {
 }
 
 void
-bh_module_set_server(bh_server *server) {
+bh_module_set_server(bh_module *module, bh_server *server) {
     _set_server(module->L, server);
 }
 
@@ -94,20 +116,30 @@ _set_timer(lua_State *L, bh_timer *timer) {
 }
 
 void
-bh_module_set_timer(bh_timer *timer) {
+bh_module_set_timer(bh_module *module, bh_timer *timer) {
     _set_timer(module->L, timer);
 }
 
 static void
-_init(lua_State *L, int sock_fd) {
+_bh_module_init(lua_State *L, int sock_fd) {
+    int i;
+    for (i=0; i<100000000; i++) {
+        printf("hello world\n");
+    }
     lua_getglobal(L, "init");
     lua_pushinteger(L, sock_fd);
+    printf("before lua_call\n");
     lua_call(L, 1, 0);
+    printf("after lua_call\n");
 }
 
 void
-bh_module_init(int sock_fd) {
-    _init(module->L, sock_fd);
+bh_module_init(bh_module *module, int sock_fd) {
+    printf("before _bh_module_init\n");
+    if (module == NULL) printf("hello world\n");
+    printf("hello world\n");
+    _bh_module_init(module->L, sock_fd);
+    printf("after _bh_module_init\n");
 }
 
 static void
@@ -120,7 +152,7 @@ _recv(lua_State *L, int sock_fd, char *data, int len) {
 }
 
 void
-bh_module_recv(int sock_fd, char *data, int len) {
+bh_module_recv(bh_module *module, int sock_fd, char *data, int len) {
     _recv(module->L, sock_fd, data, len);
 }
 
@@ -132,6 +164,6 @@ _timeout_handler(lua_State *L, char *handler_name) {
 }
 
 void
-bh_module_timeout_handler(char *handler_name) {
+bh_module_timeout_handler(bh_module *module, char *handler_name) {
     _timeout_handler(module->L, handler_name);
 }

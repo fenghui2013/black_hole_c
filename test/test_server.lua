@@ -1,4 +1,4 @@
-package.cpath = "lualib_c/?.so"
+package.cpath = "lualib_c/?.so" .. package.cpath
 
 local server = require "bh_server"
 local timer = require "bh_timer"

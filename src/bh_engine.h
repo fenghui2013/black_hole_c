@@ -4,8 +4,8 @@
 typedef struct bh_engine bh_engine;
 
 //bh_engine * bh_engine_create(int num, ...);
-bh_engine * bh_engine_create();
-void        bh_engine_start(bh_engine *engine, char *ip, int port);
+bh_engine * bh_engine_create(char *ip, int port);
+void        bh_engine_start(bh_engine *engine);
 void        bh_engine_release(bh_engine *engine);
 
 #endif

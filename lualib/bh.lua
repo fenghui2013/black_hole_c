@@ -1,4 +1,5 @@
 bh = {}
+--bh.module = nil
 --bh.engine = nil
 --bh.event = nil
 --bh.server = nil
@@ -9,6 +10,12 @@ bh.timeout_handlers = {}
 function set_engine(engine)
     if (not bh["engine"]) then
         bh["engine"] = engine
+    end
+end
+
+function set_module(module)
+    if (not bh["module"]) then
+        bh["module"] = module
     end
 end
 

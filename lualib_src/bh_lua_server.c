@@ -8,12 +8,15 @@
 
 static int
 _connect(lua_State *L) {
-    bh_event *event = (bh_event *)lua_touserdata(L, 1);
-    bh_server *server = (bh_server *)lua_touserdata(L, 2);
-    char *ip = (char *)luaL_checkstring(L, 3);
-    int port = luaL_checkint(L, 4);
+    bh_module *module = (bh_module *)lua_touserdata(L, 1);
+    bh_event *event = (bh_event *)lua_touserdata(L, 2);
+    bh_server *server = (bh_server *)lua_touserdata(L, 3);
+    const char *ip = luaL_checkstring(L, 4);
+    int port = luaL_checkint(L, 5);
 
-    int sock_fd = bh_server_client_connect(event, server, ip, port);
+    printf("before _connect\n");
+    int sock_fd = bh_server_client_connect(module, event, server, ip, port);
+    printf("after _connect\n");
 
     lua_pushinteger(L, sock_fd);
     
