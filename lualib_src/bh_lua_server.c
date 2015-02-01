@@ -14,9 +14,7 @@ _connect(lua_State *L) {
     const char *ip = luaL_checkstring(L, 4);
     int port = luaL_checkint(L, 5);
 
-    printf("before _connect\n");
     int sock_fd = bh_server_client_connect(module, event, server, ip, port);
-    printf("after _connect\n");
 
     lua_pushinteger(L, sock_fd);
     

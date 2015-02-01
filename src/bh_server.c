@@ -105,9 +105,7 @@ bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, 
     client->ip = (char *)ip;
     client->port = port;
     bh_socket_nonblocking(client->sock_fd);
-    printf("before bh_socket_connect\n");
     bh_socket_connect(client->sock_fd, client->ip, client->port);
-    printf("after bh_socket_connect\n");
     client->recv_buffer = bh_buffer_create(1024, 8*1024);
     client->send_buffer = bh_buffer_create(1024, 8*1024);
     client->next = NULL;
@@ -123,7 +121,6 @@ bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, 
     server->clients->clients_count += 1;
     printf("sock_fd: %d, clients_count: %d\n", client->sock_fd, server->clients->clients_count);
     bh_module_init(module, client->sock_fd);
-    printf("hello world\n");
     bh_event_add(event, client->sock_fd);
 
     return client->sock_fd;

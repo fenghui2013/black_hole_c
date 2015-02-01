@@ -122,24 +122,14 @@ bh_module_set_timer(bh_module *module, bh_timer *timer) {
 
 static void
 _bh_module_init(lua_State *L, int sock_fd) {
-    int i;
-    for (i=0; i<100000000; i++) {
-        printf("hello world\n");
-    }
     lua_getglobal(L, "init");
     lua_pushinteger(L, sock_fd);
-    printf("before lua_call\n");
     lua_call(L, 1, 0);
-    printf("after lua_call\n");
 }
 
 void
 bh_module_init(bh_module *module, int sock_fd) {
-    printf("before _bh_module_init\n");
-    if (module == NULL) printf("hello world\n");
-    printf("hello world\n");
     _bh_module_init(module->L, sock_fd);
-    printf("after _bh_module_init\n");
 }
 
 static void

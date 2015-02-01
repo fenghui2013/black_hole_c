@@ -6,12 +6,12 @@
 #include "bh_module.h"
 #include "bh_server.h"
 
-struct bh_engine {
-    bh_module *module;
-    bh_event *event;
-    bh_server *server;
-    bh_timer *timer;
-};
+//struct bh_engine {
+//    bh_module *module;
+//    bh_event *event;
+//    bh_server *server;
+//    bh_timer *timer;
+//};
 
 bh_engine *
 bh_engine_create(char *ip, int port) {
