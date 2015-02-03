@@ -53,11 +53,15 @@ bh_module_release(bh_module *module) {
 
 void
 bh_module_load(bh_module *module, const char *mod_name) {
-    int res;
-    //luaL_dofile(module->L, mod_name);
     luaL_loadfile(module->L, mod_name);
+    printf("load module: %s\n", mod_name);
+}
+
+void
+bh_module_call(bh_module *module) {
+    int res;
     res = lua_pcall(module->L, 0, LUA_MULTRET, 0);
-    printf("load module: %s, res: %d\n", mod_name, res);
+    printf("call res: %d\n", res);
 }
 
 static void
@@ -133,17 +137,18 @@ bh_module_init(bh_module *module, int sock_fd) {
 }
 
 static void
-_recv(lua_State *L, int sock_fd, char *data, int len) {
+_recv(lua_State *L, int sock_fd, char *data, int len, char *type) {
     lua_getglobal(L, "recv");
     lua_pushinteger(L, sock_fd);
     lua_pushlstring(L, data, len);
     lua_pushinteger(L, len);
-    lua_call(L, 3, 0);
+    lua_pushstring(L, type);
+    lua_call(L, 4, 0);
 }
 
 void
-bh_module_recv(bh_module *module, int sock_fd, char *data, int len) {
-    _recv(module->L, sock_fd, data, len);
+bh_module_recv(bh_module *module, int sock_fd, char *data, int len, char *type) {
+    _recv(module->L, sock_fd, data, len, type);
 }
 
 void

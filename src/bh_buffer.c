@@ -1,9 +1,9 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "bh_string.h"
 #include "bh_buffer.h"
 
-typedef struct bh_buffer_node bh_buffer_node;
 struct bh_buffer_node {
     bh_string *string;
     bh_buffer_node *next;
@@ -54,7 +54,6 @@ void
 _bh_buffer_node_release(bh_buffer_node *node) {
     bh_string_release(node->string);
     free(node);
-    node = NULL;
 }
 
 void
@@ -68,18 +67,20 @@ bh_buffer_release(bh_buffer *buffer) {
         _bh_buffer_node_release(temp);
         temp = node;
     }
+
+
     free(buffer);
     buffer = NULL;
 }
 
 int
 bh_buffer_get_write(bh_buffer *buffer, char **s) {
-    int free = bh_string_get_free(buffer->current_write->string);
+    int free_size = bh_string_get_free(buffer->current_write->string);
     int is_expansion = 1;
 
-    if (free == 0) {
+    if (free_size == 0) {
         is_expansion = bh_string_expansion(buffer->current_write->string, buffer->max_size);
-        free = bh_string_get_free(buffer->current_write->string);
+        free_size = bh_string_get_free(buffer->current_write->string);
     }
 
     // expansion failed
@@ -96,10 +97,10 @@ bh_buffer_get_write(bh_buffer *buffer, char **s) {
         buffer->last->next = buffer->current_write;
         buffer->last = buffer->current_write;
         buffer->last->next = NULL;
-        free = bh_string_get_free(buffer->current_write->string);
+        free_size = bh_string_get_free(buffer->current_write->string);
     }
     *s = bh_string_get_end(buffer->current_write->string);
-    return free;
+    return free_size;
 }
 
 void

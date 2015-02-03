@@ -11,8 +11,9 @@ bh_module *        bh_module_create();
 void               bh_module_release(bh_module *module);
 //void               bh_module_load(int num, ...);
 void               bh_module_load(bh_module *module, const char *mod_name);
+void               bh_module_call(bh_module *module);
 void               bh_module_init(bh_module *module, int sock_fd);
-void               bh_module_recv(bh_module *module, int sock_fd, char *data, int len);
+void               bh_module_recv(bh_module *module, int sock_fd, char *data, int len, char *type);
                    
 void               bh_module_timeout_handler(bh_module *module, char *handler_name);
 void               bh_module_set_module(bh_module *module);

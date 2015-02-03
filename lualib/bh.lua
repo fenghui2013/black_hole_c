@@ -39,13 +39,13 @@ end
 
 function init(sock_fd)
     local co = coroutine.create(
-        function(fd, data, len)
+        function(fd, data, len, type_name)
             while true do
                 if data == "" then
                     break
                 end
-                bh.handler(fd, data, len)
-                fd, data, len = coroutine.yield()
+                bh[type_name .. "_handler"](fd, data, len)
+                fd, data, len, type_name = coroutine.yield()
             end
             bh[sock_fd] = nil
         end
@@ -53,8 +53,8 @@ function init(sock_fd)
     bh[sock_fd] = co
 end
 
-function recv(sock_fd, data, len)
-    coroutine.resume(bh[sock_fd], sock_fd, data, len)
+function recv(sock_fd, data, len, type_name)
+    coroutine.resume(bh[sock_fd], sock_fd, data, len, type_name)
 end
 
 function timeout_handler(handler_name)

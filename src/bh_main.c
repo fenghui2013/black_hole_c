@@ -10,6 +10,7 @@ main() {
     //bh_module_load("./test/test_server.lua");
     bh_module_load(engine->module, "./service_lua/redis.lua");
     bh_module_load(engine->module, "./test/test_redis.lua");
+    bh_module_call(engine->module);
     bh_engine_start(engine);
     return 0;
 }

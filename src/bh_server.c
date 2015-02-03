@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdio.h>
 
 #include "bh_module.h"
@@ -14,6 +15,7 @@ struct bh_client {
     int sock_fd;  // client socket fd
     char *ip;
     int port;
+    char *type;
     bh_buffer *recv_buffer;
     bh_buffer *send_buffer;
     bh_client *prev;
@@ -74,7 +76,7 @@ bh_server_listen(bh_event *event, bh_server *server, char *ip, int port) {
 }
 
 void
-bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server) {
+bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server, char *type) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
     client->sock_fd = bh_socket_accept(server->sock_fd, &client->ip, &client->port);
@@ -84,6 +86,7 @@ bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server) {
     client->send_buffer = bh_buffer_create(1024, 8*1024);
     client->next = NULL;
     client->prev = NULL;
+    client->type = type;
     if (server->clients->first == NULL) {
         server->clients->first = client;
         server->clients->last = client;
@@ -98,7 +101,7 @@ bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server) {
 }
 
 int
-bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, const char *ip, int port) {
+bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, const char *ip, int port, char *type) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
     client->sock_fd = bh_socket_create();
@@ -110,6 +113,7 @@ bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, 
     client->send_buffer = bh_buffer_create(1024, 8*1024);
     client->next = NULL;
     client->prev = NULL;
+    client->type = type;
     if (server->clients->first == NULL) {
         server->clients->first = client;
         server->clients->last = client;
@@ -119,7 +123,6 @@ bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, 
         server->clients->last = client;
     }
     server->clients->clients_count += 1;
-    printf("sock_fd: %d, clients_count: %d\n", client->sock_fd, server->clients->clients_count);
     bh_module_init(module, client->sock_fd);
     bh_event_add(event, client->sock_fd);
 
@@ -139,7 +142,7 @@ _find(bh_server *server, int sock_fd) {
 }
 
 void
-bh_server_client_close(bh_event *event, bh_server *server, int sock_fd) {
+bh_server_client_close(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
     bh_client *client = _find(server, sock_fd);
     if (client == NULL) return;
     printf("close client ip: %s, port: %d\n", client->ip, client->port);
@@ -158,10 +161,11 @@ bh_server_client_close(bh_event *event, bh_server *server, int sock_fd) {
         client->next->prev = client->prev;
     }
     server->clients->clients_count -= 1;
+    bh_module_recv(module, sock_fd, "", 0, client->type);
     bh_event_del(event, sock_fd);
+    bh_socket_close(client->sock_fd);
     bh_buffer_release(client->recv_buffer);
     bh_buffer_release(client->send_buffer);
-    bh_socket_close(client->sock_fd);
     free(client);
     client = NULL;
 }
@@ -250,7 +254,7 @@ down_to_up(bh_module *module, bh_server *server, int sock_fd) {
     while (1) {
         size = bh_buffer_get_read(client->recv_buffer, &buffer);
         if (size == 0) break;
-        bh_module_recv(module, sock_fd, buffer, size);
+        bh_module_recv(module, sock_fd, buffer, size, client->type);
         bh_buffer_set_read(client->recv_buffer, size);
     }
 }
@@ -265,15 +269,14 @@ bh_server_run(bh_module *module, bh_event *event, bh_server *server, bh_timer *t
         for (i=0; i<events_num; i++) {
             if (event->events[i].fd == server->sock_fd) {
                 // accept new client
-                bh_server_client_accept(module, event, server);
+                bh_server_client_accept(module, event, server, "normal");
             } else {
                 if (event->events[i].read) {
                     res = bh_server_read(server, event->events[i].fd);
                     if (res == 1) {
                         down_to_up(module, server, event->events[i].fd);
                     } else if (res == 0 || res == -1) {
-                        bh_module_recv(module, event->events[i].fd, "", 0);
-                        bh_server_client_close(event, server, event->events[i].fd);
+                        bh_server_client_close(module, event, server, event->events[i].fd);
                     }
                 }
 
@@ -285,7 +288,7 @@ bh_server_run(bh_module *module, bh_event *event, bh_server *server, bh_timer *t
                     }
                     // write data error
                     if (res == -1) {
-                        bh_server_client_close(event, server, event->events[i].fd);
+                        bh_server_client_close(module, event, server, event->events[i].fd);
                     }
                 }
             }

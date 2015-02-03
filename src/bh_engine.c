@@ -23,6 +23,7 @@ bh_engine_create(char *ip, int port) {
     engine->timer = bh_timer_create();
     //bh_module_load(num, ...);
     bh_module_load(engine->module, "./lualib/bh.lua");
+    bh_module_call(engine->module);
     bh_module_set_module(engine->module);
     bh_module_set_engine(engine->module, engine);
     bh_module_set_event(engine->module, engine->event);

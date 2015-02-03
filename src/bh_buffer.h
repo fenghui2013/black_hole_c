@@ -1,6 +1,7 @@
 #ifndef _BH_BUFFER_H_
 #define _BH_BUFFER_H_
 
+typedef struct bh_buffer_node bh_buffer_node;
 typedef struct bh_buffer bh_buffer;
 
 bh_buffer *  bh_buffer_create(int size, int max_size);

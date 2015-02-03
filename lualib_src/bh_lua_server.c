@@ -13,8 +13,9 @@ _connect(lua_State *L) {
     bh_server *server = (bh_server *)lua_touserdata(L, 3);
     const char *ip = luaL_checkstring(L, 4);
     int port = luaL_checkint(L, 5);
+    const char *type = luaL_checkstring(L, 6);
 
-    int sock_fd = bh_server_client_connect(module, event, server, ip, port);
+    int sock_fd = bh_server_client_connect(module, event, server, ip, port, (char *)type);
 
     lua_pushinteger(L, sock_fd);
     
@@ -36,11 +37,12 @@ _send(lua_State *L) {
 
 static int
 _close(lua_State *L) {
-    bh_event *event = (bh_event *)lua_touserdata(L, 1);
-    bh_server *server = (bh_server *)lua_touserdata(L, 2);
-    int sock_fd = luaL_checkint(L, 3);
+    bh_module *module = (bh_module *)lua_touserdata(L, 1);
+    bh_event *event = (bh_event *)lua_touserdata(L, 2);
+    bh_server *server = (bh_server *)lua_touserdata(L, 3);
+    int sock_fd = luaL_checkint(L, 4);
 
-    bh_server_client_close(event, server, sock_fd);
+    bh_server_client_close(module, event, server, sock_fd);
 
     return 0;
 }
