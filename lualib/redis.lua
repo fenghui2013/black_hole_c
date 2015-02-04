@@ -5,15 +5,25 @@ local server = require "bh_server"
 local redis = {}
 redis.data = ""
 redis.len = 0
-redis.request_count = 1
-redis.response_count = 1
+redis.REQ_RES_MIN = 1
+redis.REQ_RES_MAX = 10^8
+redis.request_count = redis.REQ_RES_MIN
+redis.response_count = redis.REQ_RES_MIN
 
 function _request_count_inc()
-    redis.request_count = redis.request_count + 1
+    if redis.request_count == redis.REQ_RES_MAX then
+        redis.request_count = redis.REQ_RES_MIN
+    else
+        redis.request_count = redis.request_count + 1
+    end
 end
 
 function _response_count_inc()
-    redis.response_count = redis.response_count + 1
+    if redis.response_count == redis.REQ_RES_MAX then
+        redis.response_count = redis.REQ_RES_MIN
+    else
+        redis.response_count = redis.response_count + 1
+    end
 end
 
 function redis.connect(host, port)
@@ -61,6 +71,7 @@ function response_parse()
 
         if is_send and redis[redis.response_count] then
             redis[redis.response_count](temp)
+            redis[redis.response_count] = nil
         end
         redis.data = data
         redis.len = len

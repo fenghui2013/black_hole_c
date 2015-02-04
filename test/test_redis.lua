@@ -1,5 +1,5 @@
 package.cpath = package.cpath .. ";./lualib_c/?.so"
-package.path = package.path .. ";./service_lua/?.lua"
+package.path = package.path .. ";./lualib/?.lua"
 
 local redis = require "redis"
 local timer = require "bh_timer"
