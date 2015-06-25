@@ -212,16 +212,6 @@ bh_server_write(bh_server *server, int sock_fd) {
         if (res == -2) break;
         if (res == -1) return -1;
         bh_buffer_set_read(client->send_buffer, res);
-        //switch(res) {
-        //    case -2:
-        //        // again
-        //        break;
-        //    case -1:
-        //        // error
-        //        return -1;
-        //    default:
-        //        bh_buffer_set_read(client->send_buffer, res);
-        //}
     }
     return 1;
 }
@@ -282,12 +272,9 @@ bh_server_run(bh_module *module, bh_event *event, bh_server *server, bh_timer *t
 
                 if (event->events[i].write) {
                     res = bh_server_write(server, event->events[i].fd);
-                    // write data done
                     if (res == 0) {
                         bh_event_write(event, event->events[i].fd, 0);
-                    }
-                    // write data error
-                    if (res == -1) {
+                    } else if (res == -1) {
                         bh_server_client_close(module, event, server, event->events[i].fd);
                     }
                 }
