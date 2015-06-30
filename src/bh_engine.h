@@ -6,8 +6,10 @@ typedef struct bh_module bh_module;
 typedef struct bh_event bh_event;
 typedef struct bh_server bh_server;
 typedef struct bh_timer bh_timer;
+typedef struct bh_thread_pool bh_thread_pool;
 
 struct bh_engine {
+    bh_thread_pool *thread_pool;
     bh_module *module;
     bh_event *event;
     bh_server *server;
@@ -15,7 +17,7 @@ struct bh_engine {
 };
 
 //bh_engine * bh_engine_create(int num, ...);
-bh_engine * bh_engine_create(char *ip, int port);
+bh_engine * bh_engine_create(char *ip, int port, int max_threads, int queue_size);
 void        bh_engine_start(bh_engine *engine);
 void        bh_engine_release(bh_engine *engine);
 

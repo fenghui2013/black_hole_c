@@ -17,6 +17,8 @@ struct bh_event {
     bh_event_node *events;
 };
 
+typedef int (*bh_event_write_task)(bh_event *event, int sock_fd, int enable);
+
 //static bh_event *  bh_event_create();
 //static void        bh_event_release(bh_event *event);
 //static int         bh_event_add(bh_event *event, int sock_fd);

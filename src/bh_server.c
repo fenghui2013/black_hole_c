@@ -1,7 +1,9 @@
+#include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 
+#include "bh_thread_pool.h"
 #include "bh_module.h"
 #include "bh_event.h"
 #include "bh_buffer.h"
@@ -34,35 +36,205 @@ struct bh_server {
     char *ip;
     int port;
     bh_clients *clients;
+    pthread_mutex_t clients_lock;
 };
 
-bh_server *
-bh_server_create() {
-    bh_server *server = (bh_server *)malloc(sizeof(bh_server));
-    bh_clients *clients = (bh_clients *)malloc(sizeof(bh_clients));
-    clients->first = NULL;
-    clients->last = NULL;
-    clients->clients_count = 0;
-    server->clients = clients;
-    server->sock_fd = 0;
-    server->ip = "";
-    server->port = 0;
+struct bh_accept_task_arg {
+    bh_server_accept_task server_accept_task;
+    bh_module *module;
+    bh_event *event;
+    bh_server *server;
+    char *type;
+};
 
-    return server;
+bh_accept_task_arg *
+bh_accept_task_generator(bh_module *module, bh_event *event, bh_server *server, char *type) {
+    bh_accept_task_arg *accept_task_arg = (bh_accept_task_arg *)malloc(sizeof(bh_accept_task_arg));
+
+    accept_task_arg->module = module;
+    accept_task_arg->event = event;
+    accept_task_arg->server = server;
+    accept_task_arg->type = type;
+    accept_task_arg->server_accept_task = bh_server_client_accept;
+
+    return accept_task_arg;
 }
 
 void
-bh_server_release(bh_server *server) {
-    free(server->clients);
-    if (server->sock_fd != 0) {
-        bh_socket_close(server->sock_fd);
+bh_accept_task_executer(bh_accept_task_arg *accept_task_arg) {
+    (*(accept_task_arg->server_accept_task))(accept_task_arg->module, accept_task_arg->event, accept_task_arg->server, accept_task_arg->type);
+}
+
+void
+bh_accept_task_terminator(bh_accept_task_arg *accept_task_arg) {
+    free(accept_task_arg);
+    accept_task_arg = NULL;
+}
+
+struct bh_connect_task_arg {
+};
+
+
+struct bh_read_task_arg {
+    bh_server_read_task server_read_task;
+    bh_down_to_up_task down_to_up_task;
+    bh_server_close_task server_close_task;
+    bh_server *server;
+    int sock_fd;
+    bh_module *module;
+    bh_event *event;
+};
+
+bh_read_task_arg *
+bh_read_task_generator(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
+    bh_read_task_arg *read_task_arg = (bh_read_task_arg *)malloc(sizeof(bh_read_task_arg));
+
+    read_task_arg->module = module;
+    read_task_arg->event = event;
+    read_task_arg->server = server;
+    read_task_arg->sock_fd = sock_fd;
+    read_task_arg->server_read_task = bh_server_read;
+    read_task_arg->down_to_up_task = down_to_up;
+    read_task_arg->server_close_task = bh_server_client_close;
+
+    return read_task_arg;
+}
+
+void
+bh_read_task_executer(bh_read_task_arg *read_task_arg) {
+    int res;
+
+    res = (*(read_task_arg->server_read_task))(read_task_arg->server, read_task_arg->sock_fd);
+    if (res == 1) {
+        (*(read_task_arg->down_to_up_task))(read_task_arg->module, read_task_arg->server, read_task_arg->sock_fd);
+    } else if (res == 0 || res == -1) {
+        (*(read_task_arg->server_close_task))(read_task_arg->module, read_task_arg->event, read_task_arg->server, read_task_arg->sock_fd);
     }
-    free(server);
-    server = NULL;
 }
 
 void
-bh_server_listen(bh_event *event, bh_server *server, char *ip, int port) {
+bh_read_task_terminator(bh_read_task_arg *read_task_arg) {
+    free(read_task_arg);
+    read_task_arg = NULL;
+}
+
+struct bh_write_task_arg {
+    bh_server_write_task server_write_task;
+    bh_event_write_task event_write_task;
+    bh_server_close_task server_close_task;
+    bh_server *server;
+    int sock_fd;
+    bh_module *module;
+    bh_event *event;
+};
+
+bh_write_task_arg *
+bh_write_task_generator(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
+    bh_write_task_arg *write_task_arg = (bh_write_task_arg *)malloc(sizeof(bh_write_task_arg));
+
+    write_task_arg->module = module;
+    write_task_arg->event = event;
+    write_task_arg->server = server;
+    write_task_arg->sock_fd = sock_fd;
+    write_task_arg->server_write_task = bh_server_write;
+    write_task_arg->event_write_task = bh_event_write;
+    write_task_arg->server_close_task = bh_server_client_close;
+
+    return write_task_arg;
+}
+
+void
+bh_write_task_executer(bh_write_task_arg *write_task_arg) {
+    int res;
+
+    res = (*(write_task_arg->server_write_task))(write_task_arg->server, write_task_arg->sock_fd);
+    if (res == 0) {
+        (*(write_task_arg->event_write_task))(write_task_arg->event, write_task_arg->sock_fd, 0);
+    } else if (res == -1){
+        (*(write_task_arg->server_close_task))(write_task_arg->module, write_task_arg->event, write_task_arg->server, write_task_arg->sock_fd);
+    }
+}
+
+void
+bh_write_task_terminator(bh_write_task_arg *write_task_arg) {
+    free(write_task_arg);
+    write_task_arg = NULL;
+}
+
+struct bh_close_task_arg {
+};
+
+struct bh_task_arg {
+    int task_type;
+    void *task_arg;
+};
+
+bh_task_arg *
+bh_task_generator(int task_type, void *task_arg) {
+    bh_task_arg *arg = (bh_task_arg *)malloc(sizeof(bh_task_arg));
+
+    arg->task_type = task_type;
+    arg->task_arg = task_arg;
+
+    return arg;
+}
+
+void
+bh_task_executer(void *task_arg) {
+    bh_task_arg *arg = (bh_task_arg *)task_arg;
+
+    switch (arg->task_type) {
+        case ACCEPT:
+            bh_accept_task_executer((bh_accept_task_arg *)(arg->task_arg));
+            break;
+        case CONNECT:
+            bh_connect_task_executer((bh_connect_task_arg *)(arg->task_arg));
+            break;
+        case READ:
+            bh_read_task_executer((bh_read_task_arg *)(arg->task_arg));
+            break;
+        case WRITE:
+            bh_write_task_executer((bh_write_task_arg *)(arg->task_arg));
+            break;
+        case CLOSE:
+            bh_close_task_executer((bh_close_task_arg *)(arg->task_arg));
+            break;
+        default:
+            break;
+    }
+}
+
+void
+bh_task_terminator(void *task_arg) {
+    bh_task_arg *arg = (bh_task_arg *)task_arg;
+
+    switch (arg->task_type) {
+        case ACCEPT:
+            bh_accept_task_terminator((bh_accept_task_arg *)(arg->task_arg));
+            break;
+        case CONNECT:
+            bh_connect_task_terminator((bh_connect_task_arg *)(arg->task_arg));
+            break;
+        case READ:
+            bh_read_task_terminator((bh_read_task_arg *)(arg->task_arg));
+            break;
+        case WRITE:
+            bh_write_task_terminator((bh_write_task_arg *)(arg->task_arg));
+            break;
+        case CLOSE:
+            bh_close_task_terminator((bh_close_task_arg *)(arg->task_arg));
+            break;
+        default:
+            break;
+    }
+    free(arg);
+    arg = NULL;
+}
+
+static bh_server *server = NULL;
+
+void
+_bh_server_listen(bh_event *event, char *ip, int port) {
     server->sock_fd = bh_socket_create();
     server->ip = ip;
     server->port = port;
@@ -73,6 +245,41 @@ bh_server_listen(bh_event *event, bh_server *server, char *ip, int port) {
     bh_socket_bind(server->sock_fd, server->ip, server->port);
     bh_socket_listen(server->sock_fd, 1024);
     bh_event_add(event, server->sock_fd);
+}
+
+bh_server *
+bh_server_create(bh_event *event, char *ip, int port) {
+    int res;
+
+    server = (bh_server *)malloc(sizeof(bh_server));
+    bh_clients *clients = (bh_clients *)malloc(sizeof(bh_clients));
+    clients->first = NULL;
+    clients->last = NULL;
+    clients->clients_count = 0;
+    server->clients = clients;
+    server->sock_fd = 0;
+    server->ip = "";
+    server->port = 0;
+    res = pthread_mutex_init(&(server->clients_lock), NULL);
+    if (res != 0) {
+        printf("pthread_mutex_init failed\n");
+        exit(0);
+    }
+
+    _bh_server_listen(event, ip, port);
+
+    return server;
+}
+
+void
+bh_server_release(bh_server *server) {
+    free(server->clients);
+    pthread_mutex_destroy(&(server->clients_lock));
+    if (server->sock_fd != 0) {
+        bh_socket_close(server->sock_fd);
+    }
+    free(server);
+    server = NULL;
 }
 
 void
@@ -87,6 +294,8 @@ bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server, c
     client->next = NULL;
     client->prev = NULL;
     client->type = type;
+
+    pthread_mutex_lock(&(server->clients_lock));
     if (server->clients->first == NULL) {
         server->clients->first = client;
         server->clients->last = client;
@@ -96,6 +305,8 @@ bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server, c
         server->clients->last = client;
     }
     server->clients->clients_count += 1;
+    pthread_mutex_unlock(&(server->clients_lock));
+
     bh_module_init(module, client->sock_fd);
     bh_event_add(event, client->sock_fd);
 }
@@ -114,6 +325,8 @@ bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, 
     client->next = NULL;
     client->prev = NULL;
     client->type = type;
+
+    pthread_mutex_lock(&(server->clients_lock));
     if (server->clients->first == NULL) {
         server->clients->first = client;
         server->clients->last = client;
@@ -123,6 +336,8 @@ bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, 
         server->clients->last = client;
     }
     server->clients->clients_count += 1;
+    pthread_mutex_unlock(&(server->clients_lock));
+
     bh_module_init(module, client->sock_fd);
     bh_event_add(event, client->sock_fd);
 
@@ -143,10 +358,16 @@ _find(bh_server *server, int sock_fd) {
 
 void
 bh_server_client_close(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
-    bh_client *client = _find(server, sock_fd);
+    bh_client *client = NULL;
+
+    pthread_mutex_lock(&(server->clients_lock));
+    client = _find(server, sock_fd);
+    pthread_mutex_unlock(&(server->clients_lock));
+
     if (client == NULL) return;
     printf("close client ip: %s, port: %d\n", client->ip, client->port);
 
+    pthread_mutex_lock(&(server->clients_lock));
     if (client->prev==NULL && client->next==NULL) {
         server->clients->first = NULL;
         server->clients->last = NULL;
@@ -161,6 +382,8 @@ bh_server_client_close(bh_module *module, bh_event *event, bh_server *server, in
         client->next->prev = client->prev;
     }
     server->clients->clients_count -= 1;
+    pthread_mutex_unlock(&(server->clients_lock));
+
     bh_module_recv(module, sock_fd, "", 0, client->type);
     bh_event_del(event, sock_fd);
     bh_socket_close(client->sock_fd);
@@ -177,9 +400,13 @@ bh_server_client_close(bh_module *module, bh_event *event, bh_server *server, in
  */
 int
 bh_server_read(bh_server *server, int sock_fd) {
-    bh_client *client = _find(server, sock_fd);
+    bh_client *client = NULL;
     char *buffer = NULL;
     int res, size;
+
+    pthread_mutex_lock(&(server->clients_lock));
+    client = _find(server, sock_fd);
+    pthread_mutex_unlock(&(server->clients_lock));
 
     if (client == NULL) return -1;
     while (1) {
@@ -200,9 +427,13 @@ bh_server_read(bh_server *server, int sock_fd) {
  */
 int
 bh_server_write(bh_server *server, int sock_fd) {
-    bh_client *client = _find(server, sock_fd);
+    bh_client *client = NULL;
     char *buffer = NULL;
     int res, size;
+
+    pthread_mutex_lock(&(server->clients_lock));
+    client = _find(server, sock_fd);
+    pthread_mutex_unlock(&(server->clients_lock));
 
     if (client == NULL) return -1;
     while (1) {
@@ -218,9 +449,13 @@ bh_server_write(bh_server *server, int sock_fd) {
 
 void
 up_to_down(bh_event *event, bh_server *server, int sock_fd, char *data, int len) {
-    bh_client *client = _find(server, sock_fd);
+    bh_client *client = NULL;
     char *buffer = NULL;
     int size, i, j = 0;
+
+    pthread_mutex_lock(&(server->clients_lock));
+    client = _find(server, sock_fd);
+    pthread_mutex_unlock(&(server->clients_lock));
 
     if (client == NULL) return;
     while (1) {
@@ -236,9 +471,13 @@ up_to_down(bh_event *event, bh_server *server, int sock_fd, char *data, int len)
 
 void
 down_to_up(bh_module *module, bh_server *server, int sock_fd) {
-    bh_client *client = _find(server, sock_fd);
+    bh_client *client = NULL;
     char *buffer = NULL;
     int size;
+
+    pthread_mutex_lock(&(server->clients_lock));
+    client = _find(server, sock_fd);
+    pthread_mutex_unlock(&(server->clients_lock));
 
     if (client == NULL) return;
     while (1) {
@@ -250,7 +489,7 @@ down_to_up(bh_module *module, bh_server *server, int sock_fd) {
 }
 
 void
-bh_server_run(bh_module *module, bh_event *event, bh_server *server, bh_timer *timer) {
+bh_server_run(bh_thread_pool *thread_pool, bh_module *module, bh_event *event, bh_server *server, bh_timer *timer) {
     int events_num = 0, i, res, timeout;
     
     while (1) {
@@ -259,24 +498,17 @@ bh_server_run(bh_module *module, bh_event *event, bh_server *server, bh_timer *t
         for (i=0; i<events_num; i++) {
             if (event->events[i].fd == server->sock_fd) {
                 // accept new client
-                bh_server_client_accept(module, event, server, "normal");
+                bh_accept_task_arg *accept_task_arg = bh_accept_task_generator(module, event, server, "normal");
+                bh_thread_pool_add_task(thread_pool, bh_task_executer, bh_task_generator(ACCEPT, (void *)accept_task_arg), -1, bh_task_terminator);
             } else {
                 if (event->events[i].read) {
-                    res = bh_server_read(server, event->events[i].fd);
-                    if (res == 1) {
-                        down_to_up(module, server, event->events[i].fd);
-                    } else if (res == 0 || res == -1) {
-                        bh_server_client_close(module, event, server, event->events[i].fd);
-                    }
+                    bh_read_task_arg *read_task_arg = bh_read_task_generator(module, event, server, event->events[i].fd);
+                    bh_thread_pool_add_task(thread_pool, bh_task_executer, bh_task_generator(READ, (void *)read_task_arg), event->events[i].fd, bh_task_terminator);
                 }
 
                 if (event->events[i].write) {
-                    res = bh_server_write(server, event->events[i].fd);
-                    if (res == 0) {
-                        bh_event_write(event, event->events[i].fd, 0);
-                    } else if (res == -1) {
-                        bh_server_client_close(module, event, server, event->events[i].fd);
-                    }
+                    bh_write_task_arg *write_task_arg = bh_write_task_generator(module, event, server, event->events[i].fd);
+                    bh_thread_pool_add_task(thread_pool, bh_task_executer, bh_task_generator(WRITE, (void *)write_task_arg), event->events[i].fd, bh_task_terminator);
                 }
             }
         }
