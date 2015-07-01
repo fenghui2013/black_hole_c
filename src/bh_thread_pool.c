@@ -54,7 +54,7 @@ _bh_running_thread_add(pthread_t thread_id, int sock_fd) {
 
 static void
 _bh_running_thread_change(int i, pthread_t thread_id, int sock_fd) {
-    int j;
+    int j = 0;;
     bh_running_thread *temp_thread = NULL;
     if (i == -1) {
         for (j=0; j<pool->current_thread_num; j++) {
@@ -72,14 +72,14 @@ _bh_running_thread_change(int i, pthread_t thread_id, int sock_fd) {
 }
 
 /*
- * check if the thread can not run the task
+ * check if the thread can run the task
  * 0, no
  * 1, yes
  */
 static int
 _bh_running_thread_check(pthread_t thread_id, int sock_fd) {
     assert(sock_fd!=0);
-    int i, j;
+    int i, j = -1;
     bh_running_thread *temp_thread;
 
     for (i=0; i<pool->current_thread_num; i++) {

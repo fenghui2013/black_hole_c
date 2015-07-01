@@ -37,6 +37,12 @@ function set_timer(timer)
     end
 end
 
+function set_thread_pool(thread_pool)
+    if (not bh["thread_pool"]) then
+        bh["thread_pool"] = thread_pool
+    end
+end
+--[[
 function init(sock_fd)
     local co = coroutine.create(
         function(fd, data, len, type_name)
@@ -55,6 +61,20 @@ end
 
 function recv(sock_fd, data, len, type_name)
     coroutine.resume(bh[sock_fd], sock_fd, data, len, type_name)
+end
+--]]
+function init(sock_fd)
+end
+
+function recv(sock_fd, data, len, type_name)
+    while true do
+        if data == "" then
+            print("connect close")
+            break;
+        end
+        bh[type_name .. "_handler"](sock_fd, data, len);
+        fd, data, len, type_name = coroutine.yield()
+    end
 end
 
 function timeout_handler(handler_name)

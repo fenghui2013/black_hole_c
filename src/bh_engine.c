@@ -31,6 +31,7 @@ bh_engine_create(char *ip, int port, int max_threads, int queue_size) {
     bh_module_set_event(engine->module, engine->event);
     bh_module_set_server(engine->module, engine->server);
     bh_module_set_timer(engine->module, engine->timer);
+    bh_module_set_thread_pool(engine->module, engine->thread_pool);
 
     return engine;
 }

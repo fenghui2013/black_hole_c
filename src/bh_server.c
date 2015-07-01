@@ -71,9 +71,41 @@ bh_accept_task_terminator(bh_accept_task_arg *accept_task_arg) {
     accept_task_arg = NULL;
 }
 
-struct bh_connect_task_arg {
-};
-
+//struct bh_connect_task_arg {
+//    bh_server_connect_task server_connect_task;
+//    bh_module *module;
+//    bh_event *event;
+//    bh_server *server;
+//    char *ip;
+//    int port;
+//    char *type;
+//};
+//
+//bh_connect_task_arg *
+//bh_connect_task_generator(bh_module *module, bh_event *event, bh_server *server, const char *ip, int port, char *type) {
+//    bh_connect_task_arg *connect_task_arg = (bh_connect_task_arg *)malloc(sizeof(bh_connect_task_arg));
+//
+//    connect_task_arg->module = module;
+//    connect_task_arg->event = event;
+//    connect_task_arg->server = server;
+//    connect_task_arg->ip = ip;
+//    connect_task_arg->port = port;
+//    connect_task_arg->type = type;
+//    connect_task_arg->server_connect_task = bh_server_client_connect;
+//
+//    return connect_task_arg;
+//}
+//
+//void
+//bh_connect_task_executer(bh_connect_task_arg *connect_task_arg) {
+//    (*(connect_task_arg->server_connect_task))(connect_task_arg->module, connect_task_arg->event, connect_task_arg->server, connect_task_arg->type);
+//}
+//
+//void
+//bh_connect_task_terminator(bh_connect_task_arg *connect_task_arg) {
+//    free(connect_task_arg);
+//    connect_task_arg = NULL;
+//}
 
 struct bh_read_task_arg {
     bh_server_read_task server_read_task;
@@ -161,8 +193,73 @@ bh_write_task_terminator(bh_write_task_arg *write_task_arg) {
     write_task_arg = NULL;
 }
 
-struct bh_close_task_arg {
+struct bh_up_to_down_task_arg {
+    bh_up_to_down_task up_to_down_task;
+    bh_event *event;
+    bh_server *server;
+    int sock_fd;
+    char *data;
+    int len;
 };
+
+bh_up_to_down_task_arg *
+bh_up_to_down_task_generator(bh_event *event, bh_server *server, int sock_fd, char *data, int len) {
+    bh_up_to_down_task_arg *up_to_down_task_arg = (bh_up_to_down_task_arg *)malloc(sizeof(bh_up_to_down_task_arg));
+
+    up_to_down_task_arg->event = event;
+    up_to_down_task_arg->server = server;
+    up_to_down_task_arg->sock_fd = sock_fd;
+    up_to_down_task_arg->data = data;
+    up_to_down_task_arg->len = len;
+    up_to_down_task_arg->up_to_down_task = up_to_down;
+
+    return up_to_down_task_arg;
+}
+
+void
+bh_up_to_down_task_executer(bh_up_to_down_task_arg *up_to_down_task_arg) {
+    (*(up_to_down_task_arg->up_to_down_task))(up_to_down_task_arg->event, up_to_down_task_arg->server,
+            up_to_down_task_arg->sock_fd, up_to_down_task_arg->data, up_to_down_task_arg->len);
+}
+
+void
+bh_up_to_down_task_terminator(bh_up_to_down_task_arg *up_to_down_task_arg) {
+    free(up_to_down_task_arg);
+    up_to_down_task_arg = NULL;
+}
+
+struct bh_close_task_arg {
+    bh_server_close_task server_close_task;
+    bh_module *module;
+    bh_event *event;
+    bh_server *server;
+    int sock_fd;
+};
+
+bh_close_task_arg *
+bh_close_task_generator(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
+    bh_close_task_arg *close_task_arg = (bh_close_task_arg *)malloc(sizeof(bh_close_task_arg));
+
+    close_task_arg->module = module;
+    close_task_arg->event = event;
+    close_task_arg->server = server;
+    close_task_arg->sock_fd = sock_fd;
+    close_task_arg->server_close_task = bh_server_client_close;
+
+    return close_task_arg;
+}
+
+void
+bh_close_task_executer(bh_close_task_arg *close_task_arg) {
+    (*(close_task_arg->server_close_task))(close_task_arg->module, close_task_arg->event,
+            close_task_arg->server, close_task_arg->sock_fd);
+}
+
+void
+bh_close_task_terminator(bh_close_task_arg *close_task_arg) {
+    free(close_task_arg);
+    close_task_arg = NULL;
+}
 
 struct bh_task_arg {
     int task_type;
@@ -188,13 +285,16 @@ bh_task_executer(void *task_arg) {
             bh_accept_task_executer((bh_accept_task_arg *)(arg->task_arg));
             break;
         case CONNECT:
-            bh_connect_task_executer((bh_connect_task_arg *)(arg->task_arg));
+            //bh_connect_task_executer((bh_connect_task_arg *)(arg->task_arg));
             break;
         case READ:
             bh_read_task_executer((bh_read_task_arg *)(arg->task_arg));
             break;
         case WRITE:
             bh_write_task_executer((bh_write_task_arg *)(arg->task_arg));
+            break;
+        case UP_TO_DOWN:
+            bh_up_to_down_task_executer((bh_up_to_down_task_arg *)(arg->task_arg));
             break;
         case CLOSE:
             bh_close_task_executer((bh_close_task_arg *)(arg->task_arg));
@@ -213,13 +313,16 @@ bh_task_terminator(void *task_arg) {
             bh_accept_task_terminator((bh_accept_task_arg *)(arg->task_arg));
             break;
         case CONNECT:
-            bh_connect_task_terminator((bh_connect_task_arg *)(arg->task_arg));
+            //bh_connect_task_terminator((bh_connect_task_arg *)(arg->task_arg));
             break;
         case READ:
             bh_read_task_terminator((bh_read_task_arg *)(arg->task_arg));
             break;
         case WRITE:
             bh_write_task_terminator((bh_write_task_arg *)(arg->task_arg));
+            break;
+        case UP_TO_DOWN:
+            bh_up_to_down_task_terminator((bh_up_to_down_task_arg *)(arg->task_arg));
             break;
         case CLOSE:
             bh_close_task_terminator((bh_close_task_arg *)(arg->task_arg));
@@ -490,7 +593,7 @@ down_to_up(bh_module *module, bh_server *server, int sock_fd) {
 
 void
 bh_server_run(bh_thread_pool *thread_pool, bh_module *module, bh_event *event, bh_server *server, bh_timer *timer) {
-    int events_num = 0, i, res, timeout;
+    int events_num = 0, i, timeout;
     
     while (1) {
         timeout = bh_timer_get(timer);
