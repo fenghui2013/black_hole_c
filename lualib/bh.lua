@@ -1,5 +1,5 @@
 bh = {}
---bh.module = nil
+--bh.lua_module = nil
 --bh.engine = nil
 --bh.event = nil
 --bh.server = nil
@@ -13,9 +13,9 @@ function set_engine(engine)
     end
 end
 
-function set_module(module)
-    if (not bh["module"]) then
-        bh["module"] = module
+function set_lua_module(lua_module)
+    if (not bh["lua_module"]) then
+        bh["lua_module"] = lua_module
     end
 end
 
@@ -41,29 +41,6 @@ function set_thread_pool(thread_pool)
     if (not bh["thread_pool"]) then
         bh["thread_pool"] = thread_pool
     end
-end
---[[
-function init(sock_fd)
-    local co = coroutine.create(
-        function(fd, data, len, type_name)
-            while true do
-                if data == "" then
-                    break
-                end
-                bh[type_name .. "_handler"](fd, data, len)
-                fd, data, len, type_name = coroutine.yield()
-            end
-            bh[sock_fd] = nil
-        end
-    )
-    bh[sock_fd] = co
-end
-
-function recv(sock_fd, data, len, type_name)
-    coroutine.resume(bh[sock_fd], sock_fd, data, len, type_name)
-end
---]]
-function init(sock_fd)
 end
 
 function recv(sock_fd, data, len, type_name)

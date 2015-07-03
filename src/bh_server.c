@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "bh_thread_pool.h"
-#include "bh_module.h"
+#include "bh_lua_module.h"
 #include "bh_event.h"
 #include "bh_buffer.h"
 #include "bh_socket.h"
@@ -41,17 +41,15 @@ struct bh_server {
 
 struct bh_accept_task_arg {
     bh_server_accept_task server_accept_task;
-    bh_module *module;
     bh_event *event;
     bh_server *server;
     char *type;
 };
 
 bh_accept_task_arg *
-bh_accept_task_generator(bh_module *module, bh_event *event, bh_server *server, char *type) {
+bh_accept_task_generator(bh_event *event, bh_server *server, char *type) {
     bh_accept_task_arg *accept_task_arg = (bh_accept_task_arg *)malloc(sizeof(bh_accept_task_arg));
 
-    accept_task_arg->module = module;
     accept_task_arg->event = event;
     accept_task_arg->server = server;
     accept_task_arg->type = type;
@@ -62,7 +60,7 @@ bh_accept_task_generator(bh_module *module, bh_event *event, bh_server *server, 
 
 void
 bh_accept_task_executer(bh_accept_task_arg *accept_task_arg) {
-    (*(accept_task_arg->server_accept_task))(accept_task_arg->module, accept_task_arg->event, accept_task_arg->server, accept_task_arg->type);
+    (*(accept_task_arg->server_accept_task))(accept_task_arg->event, accept_task_arg->server, accept_task_arg->type);
 }
 
 void
@@ -73,7 +71,6 @@ bh_accept_task_terminator(bh_accept_task_arg *accept_task_arg) {
 
 //struct bh_connect_task_arg {
 //    bh_server_connect_task server_connect_task;
-//    bh_module *module;
 //    bh_event *event;
 //    bh_server *server;
 //    char *ip;
@@ -82,10 +79,9 @@ bh_accept_task_terminator(bh_accept_task_arg *accept_task_arg) {
 //};
 //
 //bh_connect_task_arg *
-//bh_connect_task_generator(bh_module *module, bh_event *event, bh_server *server, const char *ip, int port, char *type) {
+//bh_connect_task_generator(bh_event *event, bh_server *server, const char *ip, int port, char *type) {
 //    bh_connect_task_arg *connect_task_arg = (bh_connect_task_arg *)malloc(sizeof(bh_connect_task_arg));
 //
-//    connect_task_arg->module = module;
 //    connect_task_arg->event = event;
 //    connect_task_arg->server = server;
 //    connect_task_arg->ip = ip;
@@ -98,7 +94,7 @@ bh_accept_task_terminator(bh_accept_task_arg *accept_task_arg) {
 //
 //void
 //bh_connect_task_executer(bh_connect_task_arg *connect_task_arg) {
-//    (*(connect_task_arg->server_connect_task))(connect_task_arg->module, connect_task_arg->event, connect_task_arg->server, connect_task_arg->type);
+//    (*(connect_task_arg->server_connect_task))(connect_task_arg->event, connect_task_arg->server, connect_task_arg->type);
 //}
 //
 //void
@@ -113,15 +109,15 @@ struct bh_read_task_arg {
     bh_server_close_task server_close_task;
     bh_server *server;
     int sock_fd;
-    bh_module *module;
+    bh_lua_module *lua_module;
     bh_event *event;
 };
 
 bh_read_task_arg *
-bh_read_task_generator(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
+bh_read_task_generator(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd) {
     bh_read_task_arg *read_task_arg = (bh_read_task_arg *)malloc(sizeof(bh_read_task_arg));
 
-    read_task_arg->module = module;
+    read_task_arg->lua_module = lua_module;
     read_task_arg->event = event;
     read_task_arg->server = server;
     read_task_arg->sock_fd = sock_fd;
@@ -138,9 +134,9 @@ bh_read_task_executer(bh_read_task_arg *read_task_arg) {
 
     res = (*(read_task_arg->server_read_task))(read_task_arg->server, read_task_arg->sock_fd);
     if (res == 1) {
-        (*(read_task_arg->down_to_up_task))(read_task_arg->module, read_task_arg->server, read_task_arg->sock_fd);
+        (*(read_task_arg->down_to_up_task))(read_task_arg->lua_module, read_task_arg->server, read_task_arg->sock_fd);
     } else if (res == 0 || res == -1) {
-        (*(read_task_arg->server_close_task))(read_task_arg->module, read_task_arg->event, read_task_arg->server, read_task_arg->sock_fd);
+        (*(read_task_arg->server_close_task))(read_task_arg->lua_module, read_task_arg->event, read_task_arg->server, read_task_arg->sock_fd);
     }
 }
 
@@ -156,15 +152,15 @@ struct bh_write_task_arg {
     bh_server_close_task server_close_task;
     bh_server *server;
     int sock_fd;
-    bh_module *module;
+    bh_lua_module *lua_module;
     bh_event *event;
 };
 
 bh_write_task_arg *
-bh_write_task_generator(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
+bh_write_task_generator(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd) {
     bh_write_task_arg *write_task_arg = (bh_write_task_arg *)malloc(sizeof(bh_write_task_arg));
 
-    write_task_arg->module = module;
+    write_task_arg->lua_module = lua_module;
     write_task_arg->event = event;
     write_task_arg->server = server;
     write_task_arg->sock_fd = sock_fd;
@@ -183,7 +179,7 @@ bh_write_task_executer(bh_write_task_arg *write_task_arg) {
     if (res == 0) {
         (*(write_task_arg->event_write_task))(write_task_arg->event, write_task_arg->sock_fd, 0);
     } else if (res == -1){
-        (*(write_task_arg->server_close_task))(write_task_arg->module, write_task_arg->event, write_task_arg->server, write_task_arg->sock_fd);
+        (*(write_task_arg->server_close_task))(write_task_arg->lua_module, write_task_arg->event, write_task_arg->server, write_task_arg->sock_fd);
     }
 }
 
@@ -230,17 +226,17 @@ bh_up_to_down_task_terminator(bh_up_to_down_task_arg *up_to_down_task_arg) {
 
 struct bh_close_task_arg {
     bh_server_close_task server_close_task;
-    bh_module *module;
+    bh_lua_module *lua_module;
     bh_event *event;
     bh_server *server;
     int sock_fd;
 };
 
 bh_close_task_arg *
-bh_close_task_generator(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
+bh_close_task_generator(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd) {
     bh_close_task_arg *close_task_arg = (bh_close_task_arg *)malloc(sizeof(bh_close_task_arg));
 
-    close_task_arg->module = module;
+    close_task_arg->lua_module = lua_module;
     close_task_arg->event = event;
     close_task_arg->server = server;
     close_task_arg->sock_fd = sock_fd;
@@ -251,7 +247,7 @@ bh_close_task_generator(bh_module *module, bh_event *event, bh_server *server, i
 
 void
 bh_close_task_executer(bh_close_task_arg *close_task_arg) {
-    (*(close_task_arg->server_close_task))(close_task_arg->module, close_task_arg->event,
+    (*(close_task_arg->server_close_task))(close_task_arg->lua_module, close_task_arg->event,
             close_task_arg->server, close_task_arg->sock_fd);
 }
 
@@ -386,7 +382,7 @@ bh_server_release(bh_server *server) {
 }
 
 void
-bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server, char *type) {
+bh_server_client_accept(bh_event *event, bh_server *server, char *type) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
     client->sock_fd = bh_socket_accept(server->sock_fd, &client->ip, &client->port);
@@ -410,12 +406,11 @@ bh_server_client_accept(bh_module *module, bh_event *event, bh_server *server, c
     server->clients->clients_count += 1;
     pthread_mutex_unlock(&(server->clients_lock));
 
-    bh_module_init(module, client->sock_fd);
     bh_event_add(event, client->sock_fd);
 }
 
 int
-bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, const char *ip, int port, char *type) {
+bh_server_client_connect(bh_event *event, bh_server *server, const char *ip, int port, char *type) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
     client->sock_fd = bh_socket_create();
@@ -441,7 +436,6 @@ bh_server_client_connect(bh_module *module, bh_event *event, bh_server *server, 
     server->clients->clients_count += 1;
     pthread_mutex_unlock(&(server->clients_lock));
 
-    bh_module_init(module, client->sock_fd);
     bh_event_add(event, client->sock_fd);
 
     return client->sock_fd;
@@ -460,7 +454,7 @@ _find(bh_server *server, int sock_fd) {
 }
 
 void
-bh_server_client_close(bh_module *module, bh_event *event, bh_server *server, int sock_fd) {
+bh_server_client_close(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd) {
     bh_client *client = NULL;
 
     pthread_mutex_lock(&(server->clients_lock));
@@ -487,7 +481,7 @@ bh_server_client_close(bh_module *module, bh_event *event, bh_server *server, in
     server->clients->clients_count -= 1;
     pthread_mutex_unlock(&(server->clients_lock));
 
-    bh_module_recv(module, sock_fd, "", 0, client->type);
+    bh_lua_module_recv(lua_module, sock_fd, "", 0, client->type);
     bh_event_del(event, sock_fd);
     bh_socket_close(client->sock_fd);
     bh_buffer_release(client->recv_buffer);
@@ -573,7 +567,7 @@ up_to_down(bh_event *event, bh_server *server, int sock_fd, char *data, int len)
 }
 
 void
-down_to_up(bh_module *module, bh_server *server, int sock_fd) {
+down_to_up(bh_lua_module *lua_module, bh_server *server, int sock_fd) {
     bh_client *client = NULL;
     char *buffer = NULL;
     int size;
@@ -586,13 +580,13 @@ down_to_up(bh_module *module, bh_server *server, int sock_fd) {
     while (1) {
         size = bh_buffer_get_read(client->recv_buffer, &buffer);
         if (size == 0) break;
-        bh_module_recv(module, sock_fd, buffer, size, client->type);
+        bh_lua_module_recv(lua_module, sock_fd, buffer, size, client->type);
         bh_buffer_set_read(client->recv_buffer, size);
     }
 }
 
 void
-bh_server_run(bh_thread_pool *thread_pool, bh_module *module, bh_event *event, bh_server *server, bh_timer *timer) {
+bh_server_run(bh_thread_pool *thread_pool, bh_lua_module *lua_module, bh_event *event, bh_server *server, bh_timer *timer) {
     int events_num = 0, i, timeout;
     
     while (1) {
@@ -601,20 +595,20 @@ bh_server_run(bh_thread_pool *thread_pool, bh_module *module, bh_event *event, b
         for (i=0; i<events_num; i++) {
             if (event->events[i].fd == server->sock_fd) {
                 // accept new client
-                bh_accept_task_arg *accept_task_arg = bh_accept_task_generator(module, event, server, "normal");
+                bh_accept_task_arg *accept_task_arg = bh_accept_task_generator(event, server, "normal");
                 bh_thread_pool_add_task(thread_pool, bh_task_executer, bh_task_generator(ACCEPT, (void *)accept_task_arg), -1, bh_task_terminator);
             } else {
                 if (event->events[i].read) {
-                    bh_read_task_arg *read_task_arg = bh_read_task_generator(module, event, server, event->events[i].fd);
+                    bh_read_task_arg *read_task_arg = bh_read_task_generator(lua_module, event, server, event->events[i].fd);
                     bh_thread_pool_add_task(thread_pool, bh_task_executer, bh_task_generator(READ, (void *)read_task_arg), event->events[i].fd, bh_task_terminator);
                 }
 
                 if (event->events[i].write) {
-                    bh_write_task_arg *write_task_arg = bh_write_task_generator(module, event, server, event->events[i].fd);
+                    bh_write_task_arg *write_task_arg = bh_write_task_generator(lua_module, event, server, event->events[i].fd);
                     bh_thread_pool_add_task(thread_pool, bh_task_executer, bh_task_generator(WRITE, (void *)write_task_arg), event->events[i].fd, bh_task_terminator);
                 }
             }
         }
-        bh_timer_execute(module, timer);
+        bh_timer_execute(lua_module, timer);
     }
 }

@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-#include "bh_module.h"
+#include "bh_lua_module.h"
 #include "bh_timer.h"
 
 // unit: millisecond
@@ -143,7 +143,7 @@ bh_timer_get_end:
 }
 
 void
-bh_timer_execute(bh_module *module, bh_timer *timer) {
+bh_timer_execute(bh_lua_module *lua_module, bh_timer *timer) {
     bh_timer_node *node;
     uint64_t current_time = _get_systime();
     
@@ -154,7 +154,7 @@ bh_timer_execute(bh_module *module, bh_timer *timer) {
         node = timer->execute;
         timer->execute = timer->execute->next;
         timer->execute_count -= 1;
-        bh_module_timeout_handler(module, node->handler_name);
+        bh_lua_module_timeout_handler(lua_module, node->handler_name);
         node->times = (node->times==-1) ? node->times : (node->times-1);
         if (node->times>0 || node->times==-1) {
             node->trigger_time = _get_systime() + node->time;
