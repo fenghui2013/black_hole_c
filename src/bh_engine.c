@@ -30,7 +30,6 @@ bh_engine_create(char *ip, int port, int max_threads, int queue_size, int lua_vm
     bh_lua_module_set_event(engine->lua_module, engine->event);
     bh_lua_module_set_server(engine->lua_module, engine->server);
     bh_lua_module_set_timer(engine->lua_module, engine->timer);
-    bh_lua_module_set_thread_pool(engine->lua_module, engine->thread_pool);
 
     return engine;
 }

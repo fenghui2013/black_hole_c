@@ -37,12 +37,6 @@ function set_timer(timer)
     end
 end
 
-function set_thread_pool(thread_pool)
-    if (not bh["thread_pool"]) then
-        bh["thread_pool"] = thread_pool
-    end
-end
-
 function recv(sock_fd, data, len, type_name)
     while true do
         if data == "" then

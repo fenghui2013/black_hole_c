@@ -1,3 +1,6 @@
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -189,73 +192,73 @@ bh_write_task_terminator(bh_write_task_arg *write_task_arg) {
     write_task_arg = NULL;
 }
 
-struct bh_up_to_down_task_arg {
-    bh_up_to_down_task up_to_down_task;
-    bh_event *event;
-    bh_server *server;
-    int sock_fd;
-    char *data;
-    int len;
-};
+//struct bh_up_to_down_task_arg {
+//    bh_up_to_down_task up_to_down_task;
+//    bh_event *event;
+//    bh_server *server;
+//    int sock_fd;
+//    char *data;
+//    int len;
+//};
+//
+//bh_up_to_down_task_arg *
+//bh_up_to_down_task_generator(bh_event *event, bh_server *server, int sock_fd, char *data, int len) {
+//    bh_up_to_down_task_arg *up_to_down_task_arg = (bh_up_to_down_task_arg *)malloc(sizeof(bh_up_to_down_task_arg));
+//
+//    up_to_down_task_arg->event = event;
+//    up_to_down_task_arg->server = server;
+//    up_to_down_task_arg->sock_fd = sock_fd;
+//    up_to_down_task_arg->data = data;
+//    up_to_down_task_arg->len = len;
+//    up_to_down_task_arg->up_to_down_task = up_to_down;
+//
+//    return up_to_down_task_arg;
+//}
+//
+//void
+//bh_up_to_down_task_executer(bh_up_to_down_task_arg *up_to_down_task_arg) {
+//    (*(up_to_down_task_arg->up_to_down_task))(up_to_down_task_arg->event, up_to_down_task_arg->server,
+//            up_to_down_task_arg->sock_fd, up_to_down_task_arg->data, up_to_down_task_arg->len);
+//}
+//
+//void
+//bh_up_to_down_task_terminator(bh_up_to_down_task_arg *up_to_down_task_arg) {
+//    free(up_to_down_task_arg);
+//    up_to_down_task_arg = NULL;
+//}
 
-bh_up_to_down_task_arg *
-bh_up_to_down_task_generator(bh_event *event, bh_server *server, int sock_fd, char *data, int len) {
-    bh_up_to_down_task_arg *up_to_down_task_arg = (bh_up_to_down_task_arg *)malloc(sizeof(bh_up_to_down_task_arg));
-
-    up_to_down_task_arg->event = event;
-    up_to_down_task_arg->server = server;
-    up_to_down_task_arg->sock_fd = sock_fd;
-    up_to_down_task_arg->data = data;
-    up_to_down_task_arg->len = len;
-    up_to_down_task_arg->up_to_down_task = up_to_down;
-
-    return up_to_down_task_arg;
-}
-
-void
-bh_up_to_down_task_executer(bh_up_to_down_task_arg *up_to_down_task_arg) {
-    (*(up_to_down_task_arg->up_to_down_task))(up_to_down_task_arg->event, up_to_down_task_arg->server,
-            up_to_down_task_arg->sock_fd, up_to_down_task_arg->data, up_to_down_task_arg->len);
-}
-
-void
-bh_up_to_down_task_terminator(bh_up_to_down_task_arg *up_to_down_task_arg) {
-    free(up_to_down_task_arg);
-    up_to_down_task_arg = NULL;
-}
-
-struct bh_close_task_arg {
-    bh_server_close_task server_close_task;
-    bh_lua_module *lua_module;
-    bh_event *event;
-    bh_server *server;
-    int sock_fd;
-};
-
-bh_close_task_arg *
-bh_close_task_generator(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd) {
-    bh_close_task_arg *close_task_arg = (bh_close_task_arg *)malloc(sizeof(bh_close_task_arg));
-
-    close_task_arg->lua_module = lua_module;
-    close_task_arg->event = event;
-    close_task_arg->server = server;
-    close_task_arg->sock_fd = sock_fd;
-    close_task_arg->server_close_task = bh_server_client_close;
-
-    return close_task_arg;
-}
-
-void
-bh_close_task_executer(bh_close_task_arg *close_task_arg) {
-    (*(close_task_arg->server_close_task))(close_task_arg->lua_module, close_task_arg->event,
-            close_task_arg->server, close_task_arg->sock_fd);
-}
-
-void
-bh_close_task_terminator(bh_close_task_arg *close_task_arg) {
-    free(close_task_arg);
-    close_task_arg = NULL;
-}
+//struct bh_close_task_arg {
+//    bh_server_close_task server_close_task;
+//    bh_lua_module *lua_module;
+//    bh_event *event;
+//    bh_server *server;
+//    int sock_fd;
+//};
+//
+//bh_close_task_arg *
+//bh_close_task_generator(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd) {
+//    bh_close_task_arg *close_task_arg = (bh_close_task_arg *)malloc(sizeof(bh_close_task_arg));
+//
+//    close_task_arg->lua_module = lua_module;
+//    close_task_arg->event = event;
+//    close_task_arg->server = server;
+//    close_task_arg->sock_fd = sock_fd;
+//    close_task_arg->server_close_task = bh_server_client_close;
+//
+//    return close_task_arg;
+//}
+//
+//void
+//bh_close_task_executer(bh_close_task_arg *close_task_arg) {
+//    (*(close_task_arg->server_close_task))(close_task_arg->lua_module, close_task_arg->event,
+//            close_task_arg->server, close_task_arg->sock_fd);
+//}
+//
+//void
+//bh_close_task_terminator(bh_close_task_arg *close_task_arg) {
+//    free(close_task_arg);
+//    close_task_arg = NULL;
+//}
 
 struct bh_task_arg {
     int task_type;
@@ -290,10 +293,10 @@ bh_task_executer(void *task_arg) {
             bh_write_task_executer((bh_write_task_arg *)(arg->task_arg));
             break;
         case UP_TO_DOWN:
-            bh_up_to_down_task_executer((bh_up_to_down_task_arg *)(arg->task_arg));
+            //bh_up_to_down_task_executer((bh_up_to_down_task_arg *)(arg->task_arg));
             break;
         case CLOSE:
-            bh_close_task_executer((bh_close_task_arg *)(arg->task_arg));
+            //bh_close_task_executer((bh_close_task_arg *)(arg->task_arg));
             break;
         default:
             break;
@@ -318,10 +321,10 @@ bh_task_terminator(void *task_arg) {
             bh_write_task_terminator((bh_write_task_arg *)(arg->task_arg));
             break;
         case UP_TO_DOWN:
-            bh_up_to_down_task_terminator((bh_up_to_down_task_arg *)(arg->task_arg));
+            //bh_up_to_down_task_terminator((bh_up_to_down_task_arg *)(arg->task_arg));
             break;
         case CLOSE:
-            bh_close_task_terminator((bh_close_task_arg *)(arg->task_arg));
+            //bh_close_task_terminator((bh_close_task_arg *)(arg->task_arg));
             break;
         default:
             break;

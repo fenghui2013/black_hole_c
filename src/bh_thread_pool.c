@@ -120,7 +120,7 @@ _task_killer(void *arg) {
         pthread_mutex_lock(&(pool->queue_ready_lock));
         while ((pool->current_task_count==0 || (pool->current_task_count!=0 && !_bh_running_thread_check(thread_id, pool->queue_current_read->task_id)))
                 && !pool->shutdown) {
-            const struct timespec timeout = _get_timeout(0, 1000000*100);
+            const struct timespec timeout = _get_timeout(0, 1000000*100); // 0.1s
             //const struct timespec timeout = _get_timeout(1, 0);
             pthread_cond_timedwait(&(pool->queue_ready), &(pool->queue_ready_lock), &timeout);
         }

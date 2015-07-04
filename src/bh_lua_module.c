@@ -22,6 +22,7 @@ typedef struct bh_lua_state bh_lua_state;
 struct bh_lua_state {
     int vm_id;
     lua_State *state;
+    int stack_index;
     int sock_fd;
     bh_lua_state *prev;
     bh_lua_state *next;
@@ -220,24 +221,6 @@ bh_lua_module_timeout_handler(bh_lua_module *lua_module, char *handler_name) {
     }
 }
 
-static void
-_set_thread_pool(lua_State *L, bh_thread_pool *thread_pool) {
-    lua_getglobal(L, "set_thread_pool");
-    lua_pushlightuserdata(L, (void *)thread_pool);
-    lua_call(L, 1, 0);
-}
-
-void
-bh_lua_module_set_thread_pool(bh_lua_module *lua_module, bh_thread_pool *thread_pool) {
-    int i;
-    bh_lua_vm *temp_lua_vm = NULL;
-
-    for (i=0; i<lua_module->vm_count; i++) {
-        temp_lua_vm = (bh_lua_vm *)&(lua_module->lua_vm[i]);
-        _set_thread_pool(temp_lua_vm->vm, thread_pool);
-    }
-}
-
 static bh_lua_state *
 _find(bh_lua_state *lua_states, int sock_fd) {
     bh_lua_state *temp_lua_state = lua_states;
@@ -262,6 +245,26 @@ _recv(lua_State *L, int sock_fd, char *data, int len, char *type) {
     return lua_resume(L, NULL, 4);
 }
 
+static void
+_bh_lua_state_stack_index_update(bh_lua_state *lua_state, int vm_id) {
+    bh_lua_state *temp_lua_state = lua_state;
+    while (temp_lua_state != NULL) {
+        if (temp_lua_state->vm_id == vm_id) {
+            temp_lua_state->stack_index -= 1;
+        }
+        temp_lua_state = temp_lua_state->next;
+    }
+}
+
+static void
+_bh_lua_state_print(bh_lua_state *lua_state) {
+    bh_lua_state *temp_lua_state = lua_state;
+
+    while (temp_lua_state != NULL) {
+        temp_lua_state = temp_lua_state->next;
+    }
+}
+
 void
 bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, char *type) {
     int res;
@@ -270,12 +273,13 @@ bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, 
     lua_State *L = NULL;
 
     pthread_mutex_lock(&(lua_module->lua_state_lock));
-    temp_lua_vm = (bh_lua_vm *)&(lua_module->lua_vm[lua_module->current_vm]);
     temp_lua_state = _find(lua_module->first, sock_fd);
     if (temp_lua_state == NULL) {
+        temp_lua_vm = (bh_lua_vm *)&(lua_module->lua_vm[lua_module->current_vm]);
         L = lua_newthread(temp_lua_vm->vm);
         temp_lua_state = (bh_lua_state *)malloc(sizeof(bh_lua_state));
         temp_lua_state->state = L;
+        temp_lua_state->stack_index = lua_gettop(temp_lua_vm->vm);
         temp_lua_state->sock_fd = sock_fd;
         temp_lua_state->vm_id = lua_module->current_vm;
         temp_lua_state->prev = NULL;
@@ -292,6 +296,8 @@ bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, 
         if (lua_module->current_vm == lua_module->vm_count) {
             lua_module->current_vm = 0;
         }
+    } else {
+        temp_lua_vm = (bh_lua_vm *)&(lua_module->lua_vm[temp_lua_state->vm_id]);
     }
     L = temp_lua_state->state;
     pthread_mutex_unlock(&(lua_module->lua_state_lock));
@@ -302,6 +308,10 @@ bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, 
 
     pthread_mutex_lock(&(lua_module->lua_state_lock));
     if (res == LUA_OK) {
+        pthread_mutex_lock(&(temp_lua_vm->vm_lock));
+        lua_remove(temp_lua_vm->vm, temp_lua_state->stack_index);
+        _bh_lua_state_stack_index_update(temp_lua_state->next, temp_lua_state->vm_id);
+        pthread_mutex_unlock(&(temp_lua_vm->vm_lock));
         if (temp_lua_state->prev==NULL && temp_lua_state->next==NULL) {
             lua_module->first = NULL;
             lua_module->last = NULL;
@@ -315,6 +325,7 @@ bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, 
             temp_lua_state->prev->next = temp_lua_state->next;
             temp_lua_state->next->prev = temp_lua_state->prev;
         }
+        _bh_lua_state_print(lua_module->first);
         free(temp_lua_state);
         temp_lua_state = NULL;
     } else if (res == LUA_YIELD) {

@@ -25,7 +25,7 @@ typedef void (*bh_server_accept_task)(bh_event *event, bh_server *server, char *
 typedef int  (*bh_server_read_task)(bh_server *server, int sock_fd);
 typedef int  (*bh_server_write_task)(bh_server *server, int sock_fd);
 typedef void (*bh_down_to_up_task)(bh_lua_module *lua_module, bh_server *server, int sock_fd);
-typedef void (*bh_up_to_down_task)(bh_event *event, bh_server *server, int sock_fd, char *data, int len);
+//typedef void (*bh_up_to_down_task)(bh_event *event, bh_server *server, int sock_fd, char *data, int len, int data_ref);
 typedef void (*bh_server_close_task)(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd);
 
 typedef struct bh_task_arg bh_task_arg;
@@ -34,8 +34,8 @@ typedef struct bh_accept_task_arg bh_accept_task_arg;
 //typedef struct bh_connect_task_arg bh_connect_task_arg;
 typedef struct bh_read_task_arg bh_read_task_arg;
 typedef struct bh_write_task_arg bh_write_task_arg;
-typedef struct bh_up_to_down_task_arg bh_up_to_down_task_arg;
-typedef struct bh_close_task_arg bh_close_task_arg;
+//typedef struct bh_up_to_down_task_arg bh_up_to_down_task_arg;
+//typedef struct bh_close_task_arg bh_close_task_arg;
 
 bh_task_arg *            bh_task_generator(int task_type, void *task_arg);
 void                     bh_task_executer(void *task_arg);
@@ -53,12 +53,12 @@ void                     bh_read_task_terminator(bh_read_task_arg *read_task_arg
 bh_write_task_arg *      bh_write_task_generator(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd);
 void                     bh_write_task_executer(bh_write_task_arg *write_task_arg);
 void                     bh_write_task_terminator(bh_write_task_arg *write_task_arg);
-bh_up_to_down_task_arg * bh_up_to_down_task_generator(bh_event *event, bh_server *server, int sock_fd, char *data, int len);
-void                     bh_up_to_down_task_executer(bh_up_to_down_task_arg *up_to_down_task_arg);
-void                     bh_up_to_down_task_terminator(bh_up_to_down_task_arg *up_to_down_task_arg);
-bh_close_task_arg *      bh_close_task_generator(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd);
-void                     bh_close_task_executer(bh_close_task_arg *close_task_arg);
-void                     bh_close_task_terminator(bh_close_task_arg *close_task_arg);
+//bh_up_to_down_task_arg * bh_up_to_down_task_generator(bh_event *event, bh_server *server, int sock_fd, char *data, int len, int data_ref);
+//void                     bh_up_to_down_task_executer(bh_up_to_down_task_arg *up_to_down_task_arg);
+//void                     bh_up_to_down_task_terminator(bh_up_to_down_task_arg *up_to_down_task_arg);
+//bh_close_task_arg *      bh_close_task_generator(bh_lua_module *lua_module, bh_event *event, bh_server *server, int sock_fd);
+//void                     bh_close_task_executer(bh_close_task_arg *close_task_arg);
+//void                     bh_close_task_terminator(bh_close_task_arg *close_task_arg);
 
 
 void         bh_server_client_accept(bh_event *event, bh_server *server, char *type);
