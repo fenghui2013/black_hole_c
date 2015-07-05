@@ -1,5 +1,3 @@
-local db = {}
-
 local command = {}
 
 function command.GET(key)
@@ -12,6 +10,10 @@ function command.SET(key, value)
     return last
 end
 
-function data_handler(sock_fd, data, len)
-
+function protocol_parser(data, len)
 end
+
+function data_handler(sock_fd, data, len)
+end
+
+bh_run("simpledb", data_handler)

@@ -4,7 +4,7 @@ local server = require "bh_server"
 local timer = require "bh_timer"
 
 function data_handler(sock_fd, data, len)
-    server.send(_G["bh"]["event"], _G["bh"]["server"], sock_fd, data, len)
+    server.send(bh_get_event(), bh_get_server(), sock_fd, data, len)
 end
 
-_G["bh"]["normal_handler"] = data_handler
+bh_run("normal", data_handler)
