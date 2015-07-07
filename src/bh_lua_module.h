@@ -12,7 +12,7 @@ bh_lua_module * bh_lua_module_create(int lua_vm_count);
 void            bh_lua_module_release(bh_lua_module *lua_module);
 //void            bh_module_load(int num, ...);
 void            bh_lua_module_load(bh_lua_module *lua_module, const char *mod_name);
-void            bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, char *type);
+int             bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, char *type);
                 
 void            bh_lua_module_timeout_handler(bh_lua_module *lua_module, char *handler_name);
 void            bh_lua_module_set_lua_module(bh_lua_module *lua_module);

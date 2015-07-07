@@ -13,7 +13,7 @@ struct bh_config {
     int port;
     int threads;
     int lua_vms;
-    char *lua_services;
+    char *lua_modules;
 };
 
 bh_config *
@@ -25,6 +25,7 @@ bh_config_create() {
     config->port = 0;
     config->threads = 0;
     config->lua_vms = 0;
+    config->lua_modules = NULL;
     
     return config;
 }
@@ -32,7 +33,7 @@ bh_config_create() {
 void
 bh_config_release(bh_config *config) {
     free(config->ip);
-    free(config->lua_services);
+    free(config->lua_modules);
     lua_close(config->L);
     free(config);
     config = NULL;
@@ -53,7 +54,7 @@ bh_config_load(bh_config *config, const char *config_file) {
     lua_getglobal(config->L, "port");
     lua_getglobal(config->L, "threads");
     lua_getglobal(config->L, "lua_vms");
-    lua_getglobal(config->L, "lua_services");
+    lua_getglobal(config->L, "lua_modules");
 
     temp = (char *)lua_tostring(config->L, 1);
     config->ip = (char *)malloc(strlen(temp)+1);
@@ -68,10 +69,10 @@ bh_config_load(bh_config *config, const char *config_file) {
     config->lua_vms = luaL_checkint(config->L, 4);
 
     temp = (char *)lua_tostring(config->L, 5);
-    config->lua_services = (char *)malloc(strlen(temp)+1);
-    memset(config->lua_services, 0, strlen(temp)+1);
+    config->lua_modules = (char *)malloc(strlen(temp)+1);
+    memset(config->lua_modules, 0, strlen(temp)+1);
     for (i=0; i<strlen(temp); i++) {
-        config->lua_services[i] = temp[i];
+        config->lua_modules[i] = temp[i];
     }
 
     lua_pop(config->L, 5);
@@ -98,6 +99,6 @@ bh_config_get_lua_vms(bh_config *config) {
 }
 
 char *
-bh_config_get_lua_services(bh_config *config) {
-    return config->lua_services;
+bh_config_get_lua_modules(bh_config *config) {
+    return config->lua_modules;
 }

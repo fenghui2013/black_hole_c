@@ -11,7 +11,7 @@ int
 main() {
     bh_engine *engine;
     bh_config *config = NULL;
-    char *lua_services = NULL;
+    char *lua_modules = NULL;
     char *d = ";";
     char *p = NULL;
 
@@ -20,9 +20,9 @@ main() {
 
     engine = bh_engine_create(bh_config_get_ip(config), bh_config_get_port(config),
             bh_config_get_threads(config), 512, bh_config_get_lua_vms(config));
-    lua_services = bh_config_get_lua_services(config);
+    lua_modules = bh_config_get_lua_modules(config);
     
-    p = strtok(lua_services, d);
+    p = strtok(lua_modules, d);
     while (p) {
         bh_lua_module_load(engine->lua_module, p);
         p = strtok(NULL, d);

@@ -574,6 +574,7 @@ down_to_up(bh_lua_module *lua_module, bh_server *server, int sock_fd) {
     bh_client *client = NULL;
     char *buffer = NULL;
     int size;
+    int left_size;
 
     pthread_mutex_lock(&(server->clients_lock));
     client = _find(server, sock_fd);
@@ -583,8 +584,9 @@ down_to_up(bh_lua_module *lua_module, bh_server *server, int sock_fd) {
     while (1) {
         size = bh_buffer_get_read(client->recv_buffer, &buffer);
         if (size == 0) break;
-        bh_lua_module_recv(lua_module, sock_fd, buffer, size, client->type);
-        bh_buffer_set_read(client->recv_buffer, size);
+        left_size = bh_lua_module_recv(lua_module, sock_fd, buffer, size, client->type);
+        if (size == left_size) break;
+        bh_buffer_set_read(client->recv_buffer, size-left_size);
     }
 }
 

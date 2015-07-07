@@ -1,3 +1,5 @@
+package.cpath = package.cpath .. ";./lualib_c/bh_server.so"
+
 bh = {}
 --bh.lua_module = nil
 --bh.engine = nil
@@ -6,6 +8,8 @@ bh = {}
 --bh.timer = nil
 --bh.handler = nil
 bh.timeout_handlers = {}
+
+local server = require "bh_server"
 
 function set_engine(engine)
     if (not bh["engine"]) then
@@ -59,21 +63,23 @@ end
 
 function recv(sock_fd, data, len, type_name)
     while true do
+        local left_len = bh[type_name .. "_handler"](sock_fd, data, len)
         if data == "" then
-            print("connect close")
             break;
         end
-        bh[type_name .. "_handler"](sock_fd, data, len);
-        fd, data, len, type_name = coroutine.yield()
+        sock_fd, data, len, type_name = coroutine.yield(left_len)
     end
+    return 0
 end
 
 function timeout_handler(handler_name)
     bh.timeout_handlers[handler_name]()
 end
 
+function bh_write(sock_fd, data, len)
+    server.send(bh_get_event(), bh_get_server(), sock_fd, data, len)
+end
+
 function bh_run(module_name, run_fun)
     bh[module_name .. "_handler"] = run_fun
 end
-
-_G["bh"] = bh

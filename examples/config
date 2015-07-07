@@ -2,5 +2,5 @@ root = "./"
 ip = "127.0.0.1"
 port = 8000
 threads = 3
-lua_vms = 9
-lua_services = root .. "test/test_handler.lua;"
+lua_vms = 1
+lua_modules = root .. "lualib/cgi.lua;"

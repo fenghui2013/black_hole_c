@@ -234,15 +234,31 @@ _find(bh_lua_state *lua_states, int sock_fd) {
     return temp_lua_state;
 }
 
+//static int
+//_recv(lua_State *L, int sock_fd, char *data, int len, char *type) {
+//    lua_getglobal(L, "recv");
+//    lua_pushinteger(L, sock_fd);
+//    lua_pushlstring(L, data, len);
+//    lua_pushinteger(L, len);
+//    lua_pushstring(L, type);
+//    //lua_call(L, 4, 0);
+//    return lua_resume(L, NULL, 4);
+//}
+
 static int
-_recv(lua_State *L, int sock_fd, char *data, int len, char *type) {
+_recv(lua_State *L, int sock_fd, char *data, int len, char *type, int *left_len) {
+    int res;
+
     lua_getglobal(L, "recv");
     lua_pushinteger(L, sock_fd);
     lua_pushlstring(L, data, len);
     lua_pushinteger(L, len);
     lua_pushstring(L, type);
     //lua_call(L, 4, 0);
-    return lua_resume(L, NULL, 4);
+    res = lua_resume(L, NULL, 4);
+    *left_len = luaL_checkint(L, 1);
+
+    return res;
 }
 
 static void
@@ -265,6 +281,7 @@ _bh_lua_state_print(bh_lua_state *lua_state) {
     }
 }
 
+/*
 void
 bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, char *type) {
     int res;
@@ -333,4 +350,76 @@ bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, 
         printf("lua_error: %d\n", res);
     }
     pthread_mutex_unlock(&(lua_module->lua_state_lock));
+}
+*/
+int
+bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, char *type) {
+    int res, left_len;
+    bh_lua_state *temp_lua_state = NULL;
+    bh_lua_vm *temp_lua_vm = NULL;
+    lua_State *L = NULL;
+
+    pthread_mutex_lock(&(lua_module->lua_state_lock));
+    temp_lua_state = _find(lua_module->first, sock_fd);
+    if (temp_lua_state == NULL) {
+        temp_lua_vm = (bh_lua_vm *)&(lua_module->lua_vm[lua_module->current_vm]);
+        L = lua_newthread(temp_lua_vm->vm);
+        temp_lua_state = (bh_lua_state *)malloc(sizeof(bh_lua_state));
+        temp_lua_state->state = L;
+        temp_lua_state->stack_index = lua_gettop(temp_lua_vm->vm);
+        temp_lua_state->sock_fd = sock_fd;
+        temp_lua_state->vm_id = lua_module->current_vm;
+        temp_lua_state->prev = NULL;
+        temp_lua_state->next = NULL;
+        if (lua_module->first == NULL) {
+            lua_module->first = temp_lua_state;
+            lua_module->last = temp_lua_state;
+        } else {
+            lua_module->last->next = temp_lua_state;
+            temp_lua_state->prev = lua_module->last;
+            lua_module->last = temp_lua_state;
+        }
+        lua_module->current_vm += 1;
+        if (lua_module->current_vm == lua_module->vm_count) {
+            lua_module->current_vm = 0;
+        }
+    } else {
+        temp_lua_vm = (bh_lua_vm *)&(lua_module->lua_vm[temp_lua_state->vm_id]);
+    }
+    L = temp_lua_state->state;
+    pthread_mutex_unlock(&(lua_module->lua_state_lock));
+
+    pthread_mutex_lock(&(temp_lua_vm->vm_lock));
+    res = _recv(L, sock_fd, data, len, type, &left_len);
+    pthread_mutex_unlock(&(temp_lua_vm->vm_lock));
+
+    pthread_mutex_lock(&(lua_module->lua_state_lock));
+    if (res == LUA_OK) {
+        pthread_mutex_lock(&(temp_lua_vm->vm_lock));
+        lua_remove(temp_lua_vm->vm, temp_lua_state->stack_index);
+        _bh_lua_state_stack_index_update(temp_lua_state->next, temp_lua_state->vm_id);
+        pthread_mutex_unlock(&(temp_lua_vm->vm_lock));
+        if (temp_lua_state->prev==NULL && temp_lua_state->next==NULL) {
+            lua_module->first = NULL;
+            lua_module->last = NULL;
+        } else if (temp_lua_state->prev==NULL && temp_lua_state->next!=NULL) {
+            lua_module->first = temp_lua_state->next;
+            temp_lua_state->next->prev = NULL;
+        } else if (temp_lua_state->prev!=NULL && temp_lua_state->next==NULL) {
+            lua_module->last = temp_lua_state->prev;
+            temp_lua_state->prev->next = NULL;
+        } else {
+            temp_lua_state->prev->next = temp_lua_state->next;
+            temp_lua_state->next->prev = temp_lua_state->prev;
+        }
+        _bh_lua_state_print(lua_module->first);
+        free(temp_lua_state);
+        temp_lua_state = NULL;
+    } else if (res == LUA_YIELD) {
+    } else {
+        printf("lua_error: %d\n", res);
+    }
+    pthread_mutex_unlock(&(lua_module->lua_state_lock));
+
+    return left_len;
 }

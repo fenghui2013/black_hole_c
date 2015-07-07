@@ -10,5 +10,5 @@ char *      bh_config_get_ip(bh_config *config);
 int         bh_config_get_port(bh_config *config);
 int         bh_config_get_threads(bh_config *config);
 int         bh_config_get_lua_vms(bh_config *config);
-char *      bh_config_get_lua_services(bh_config *config);
+char *      bh_config_get_lua_modules(bh_config *config);
 #endif
