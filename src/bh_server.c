@@ -585,6 +585,7 @@ down_to_up(bh_lua_module *lua_module, bh_server *server, int sock_fd) {
         size = bh_buffer_get_read(client->recv_buffer, &buffer);
         if (size == 0) break;
         left_size = bh_lua_module_recv(lua_module, sock_fd, buffer, size, client->type);
+        printf("size: %d, left_size: %d\n", size, left_size);
         if (size == left_size) break;
         bh_buffer_set_read(client->recv_buffer, size-left_size);
     }
