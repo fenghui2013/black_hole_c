@@ -1,6 +1,16 @@
 root = "./"
-ip = "127.0.0.1"
+ip = "192.168.1.108"
 port = 8000
 threads = 3
 lua_vms = 1
 lua_modules = root .. "lualib/bh_http.lua;"
+http = {
+    {
+        root = "./",
+        server_name = "127.0.0.1" ,
+        [".*$.lua"] = {
+        },
+        [".*$.html"] = {
+        }
+    }
+}

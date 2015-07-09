@@ -1,26 +1,35 @@
-cgi_envs = {}
-cgi_env = {
-    SERVER_PROTOCOL = "",
-    REQUEST_METHOD = "",
-    REQUEST_URI = "",
-    QUERY_STRING = "",
-    DOCUMENT_ROOT = "./"
-}
+package.path = package.path .. ";./lualib/?.lua"
 
-SERVER_PROTOCOL = ""
-REQUEST_METHOD = ""
-REQUEST_URI = ""
-QUERY_STRING = ""
-DOCUMENT_ROOT = "./"
+local bh_url = require "bh_url"
+
+cgi_envs = {}
+--SERVER_PROTOCOL = ""
+--REQUEST_METHOD = ""
+--REQUEST_URI = ""
+--QUERY_STRING = ""
+--DOCUMENT_ROOT = "./"
+SERVER = {}
+GET = {}
+POST = {}
 
 coroutines = {}
 
-function set_global_cgi_env(sock_fd)
-    SERVER_PROTOCOL = cgi_envs[sock_fd]["SERVER_PROTOCOL"]
-    REQUEST_METHOD = cgi_envs[sock_fd]["REQUEST_METHOD"]
-    REQUEST_URI = cgi_envs[sock_fd]["REQUEST_URI"]
-    QUERY_STRING = cgi_envs[sock_fd]["QUERY_STRING"]
-    DOCUMENT_ROOT = cgi_envs[sock_fd]["DOCUMENT_ROOT"]
+function global_cgi_env_set(sock_fd)
+    SERVER = cgi_envs[sock_fd]["SERVER"]
+    GET = cgi_envs[sock_fd]["GET"]
+    POST = cgi_envs[sock_fd]["POST"]
+end
+
+function global_cgi_env_reset(sock_fd)
+    if cgi_envs[sock_fd]["SERVER"]["REQUEST_METHOD"] == "GET" then
+        cgi_envs[sock_fd]["GET"] = {}
+    elseif cgi_envs[sock_fd]["SERVER"]["REQUEST_METHOD"] == "POST" then
+        cgi_envs[sock_fd]["POST"] = {}
+    else
+    end
+    SERVER ={}
+    GET = {}
+    POST = {}
 end
 
 function get_newline(buf, pos)
@@ -31,7 +40,7 @@ end
 function protocol_parser(sock_fd, data, len)
     local index = 1
     local first_line = true
-    local path, args
+    local path, args = nil, nil
     while true do
         local b, e, str = get_newline(data, index)
         print(b, e, str)
@@ -40,7 +49,7 @@ function protocol_parser(sock_fd, data, len)
         end
         if str == "" then
             --body
-            if cgi_envs[sock_fd]["REQUEST_METHOD"] == "POST" then
+            if cgi_envs[sock_fd]["SERVER"]["REQUEST_METHOD"] == "POST" then
             end
             index = e + 1
             break
@@ -57,20 +66,28 @@ function protocol_parser(sock_fd, data, len)
             else
                 path, args = url, nil
             end
-            cgi_envs[sock_fd]["SERVER_PROTOCOL"] = "HTTP/" .. httpver
-            cgi_envs[sock_fd]["REQUEST_METHOD"] = method
-            cgi_envs[sock_fd]["REQUEST_URI"] = path
-            cgi_envs[sock_fd]["QUERY_STRING"] = args
+            cgi_envs[sock_fd]["SERVER"]["SERVER_PROTOCOL"] = "HTTP/" .. httpver
+            cgi_envs[sock_fd]["SERVER"]["REQUEST_METHOD"] = method
+            cgi_envs[sock_fd]["SERVER"]["REQUEST_URI"] = bh_url.path_parser(path)
+            cgi_envs[sock_fd]["SERVER"]["QUERY_STRING"] = args
+            if method == "GET" then
+                if args then
+                    local res = bh_url.query_string_parser(args)
+                    cgi_envs[sock_fd]["GET"] = res
+                end
+            elseif method == "POST" then
+                if args then
+                    local res = bh_url.query_string_parser(args)
+                    cgi_envs[sock_fd]["POST"] = res
+                end
+            else
+            end
             first_line = false
         else
             --headers
             if string.find(str, ":") then
-                local key, value = string.match(str, "(.*)%s*:%s*(.*)")
+                local key, value = string.match(str, "(.-)%s*:%s*(.*)")
                 print(key, value)
-                if cgi_envs[sock_fd]["REQUEST_METHOD"] == "GET" then
-                elseif cgi_envs[sock_fd]["REQUEST_METHOD"] == "POST" then
-                else
-                end
             else
                 return 400, len+1-index
             end
@@ -89,7 +106,10 @@ function data_handler(sock_fd, data, len)
     end
 
     if not cgi_envs[sock_fd] then
-        cgi_envs[sock_fd] = cgi_env
+        cgi_envs[sock_fd] = {}
+        cgi_envs[sock_fd]["SERVER"] = {}
+        cgi_envs[sock_fd]["GET"] = {}
+        cgi_envs[sock_fd]["POST"] = {}
     end
 
     if not coroutines[sock_fd] then
@@ -101,13 +121,13 @@ function data_handler(sock_fd, data, len)
     local err, code, left_len = coroutine.resume(coroutines[sock_fd], sock_fd, data, len)
     print(err, code, left_len)
 
+    global_cgi_env_set(sock_fd)
     if code == 200 then
         coroutines[sock_fd] = nil
-        set_global_cgi_env(sock_fd)
-        print(SERVER_PROTOCOL)
-        if string.find(REQUEST_URI, ".*%.lua$") then
+        print(SERVER["SERVER_PROTOCOL"])
+        if string.find(SERVER["REQUEST_URI"], ".*%.lua") then
             res = dofile("./examples/index.lua")
-        elseif string.find(REQUEST_URI, ".*%.html$") then
+        elseif string.find(SERVER["REQUEST_URI"], ".*%.html") then
             --local f = io.open(DOCUMNET_ROOT .. REQUEST_URI, "r")
             local f = io.open("./examples/index.html", "r")
             res = f:read("*a")
@@ -115,18 +135,29 @@ function data_handler(sock_fd, data, len)
         else
             res = ""
         end
-        local response = SERVER_PROTOCOL .. " 200 OK\r\n"
+        local response = SERVER["SERVER_PROTOCOL"] .. " 200 OK\r\n"
         response = response .. "Content-type: text/html\r\n"
         response = response .. "Content-length: " .. #res .. "\r\n"
         response = response .. "\r\n"
         response = response .. res
         print(response)
         bh_write(sock_fd, response, #response)
+        global_cgi_env_reset(sock_fd)
     elseif code == 100 then
     elseif code == 400 then
     else
     end
     return left_len
+end
+
+function bh_include(file_name)
+    local f = io.open(file_name, "r")
+    local res = f:read("*a")
+    f:close()
+    res = string.gsub(res, "%[%[(.-)%]%]", function(args)
+        return load(args)()
+    end)
+    return res
 end
 
 bh_run("normal", data_handler)
