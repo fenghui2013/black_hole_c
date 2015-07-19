@@ -423,3 +423,19 @@ bh_lua_module_recv(bh_lua_module *lua_module, int sock_fd, char *data, int len, 
 
     return left_len;
 }
+
+static void
+_http_server_run(lua_State *L) {
+    lua_getglobal(L, "bh_http_server_run");
+    lua_call(L, 0, 0);
+}
+
+void
+bh_lua_module_http_server_run(bh_lua_module *lua_module) {
+    bh_lua_vm *temp_lua_vm = NULL;
+
+    if (lua_module->vm_count > 0) {
+        temp_lua_vm = (bh_lua_vm *)&(lua_module->lua_vm[0]);
+        _http_server_run(temp_lua_vm->vm);
+    }
+}

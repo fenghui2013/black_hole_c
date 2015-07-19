@@ -20,4 +20,6 @@ void            bh_lua_module_set_engine(bh_lua_module *lua_module, bh_engine *e
 void            bh_lua_module_set_event(bh_lua_module *lua_module, bh_event *event);
 void            bh_lua_module_set_server(bh_lua_module *lua_module, bh_server *server);
 void            bh_lua_module_set_timer(bh_lua_module *lua_module, bh_timer *timer);
+
+void            bh_lua_module_http_server_run(bh_lua_module *lua_module);
 #endif

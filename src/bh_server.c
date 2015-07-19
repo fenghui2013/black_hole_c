@@ -34,10 +34,17 @@ struct bh_clients {
     int clients_count;
 };
 
-struct bh_server {
+typedef struct bh_server_node bh_server_node;
+struct bh_server_node {
     int sock_fd;
-    char *ip;
+    const char *ip;
     int port;
+    bh_server_node *next;
+};
+
+struct bh_server {
+    bh_server_node *first;
+    bh_server_node *last;
     bh_clients *clients;
     pthread_mutex_t clients_lock;
 };
@@ -46,15 +53,17 @@ struct bh_accept_task_arg {
     bh_server_accept_task server_accept_task;
     bh_event *event;
     bh_server *server;
+    int server_fd;
     char *type;
 };
 
 bh_accept_task_arg *
-bh_accept_task_generator(bh_event *event, bh_server *server, char *type) {
+bh_accept_task_generator(bh_event *event, bh_server *server, int server_fd, char *type) {
     bh_accept_task_arg *accept_task_arg = (bh_accept_task_arg *)malloc(sizeof(bh_accept_task_arg));
 
     accept_task_arg->event = event;
     accept_task_arg->server = server;
+    accept_task_arg->server_fd = server_fd;
     accept_task_arg->type = type;
     accept_task_arg->server_accept_task = bh_server_client_accept;
 
@@ -63,7 +72,7 @@ bh_accept_task_generator(bh_event *event, bh_server *server, char *type) {
 
 void
 bh_accept_task_executer(bh_accept_task_arg *accept_task_arg) {
-    (*(accept_task_arg->server_accept_task))(accept_task_arg->event, accept_task_arg->server, accept_task_arg->type);
+    (*(accept_task_arg->server_accept_task))(accept_task_arg->event, accept_task_arg->server, accept_task_arg->server_fd, accept_task_arg->type);
 }
 
 void
@@ -336,17 +345,26 @@ bh_task_terminator(void *task_arg) {
 static bh_server *server = NULL;
 
 void
-_bh_server_listen(bh_event *event, char *ip, int port) {
-    server->sock_fd = bh_socket_create();
-    server->ip = ip;
-    server->port = port;
-    printf("sock_fd: %d\n", server->sock_fd);
-    printf("ip: %s\n", server->ip);
-    printf("port: %d\n", server->port);
-    bh_socket_nonblocking(server->sock_fd);
-    bh_socket_bind(server->sock_fd, server->ip, server->port);
-    bh_socket_listen(server->sock_fd, 1024);
-    bh_event_add(event, server->sock_fd);
+bh_server_listen(bh_event *event, const char *ip, int port) {
+    bh_server_node *server_node = (bh_server_node *)malloc(sizeof(bh_server_node));
+    server_node->sock_fd = bh_socket_create();
+    server_node->ip = ip;
+    server_node->port = port;
+    server_node->next = NULL;
+    printf("sock_fd: %d\n", server_node->sock_fd);
+    printf("ip: %s\n", server_node->ip);
+    printf("port: %d\n", server_node->port);
+    bh_socket_nonblocking(server_node->sock_fd);
+    bh_socket_bind(server_node->sock_fd, server_node->ip, server_node->port);
+    bh_socket_listen(server_node->sock_fd, 1024);
+    bh_event_add(event, server_node->sock_fd);
+    if (server->first == NULL) {
+        server->first = server_node;
+        server->last = server_node;
+    } else {
+        server->last->next = server_node;
+        server->last = server->last->next;
+    }
 }
 
 bh_server *
@@ -359,36 +377,40 @@ bh_server_create(bh_event *event, char *ip, int port) {
     clients->last = NULL;
     clients->clients_count = 0;
     server->clients = clients;
-    server->sock_fd = 0;
-    server->ip = "";
-    server->port = 0;
+    server->first = NULL;
+    server->last = NULL;
     res = pthread_mutex_init(&(server->clients_lock), NULL);
     if (res != 0) {
         printf("pthread_mutex_init failed\n");
         exit(0);
     }
 
-    _bh_server_listen(event, ip, port);
+    bh_server_listen(event, ip, port);
 
     return server;
 }
 
 void
 bh_server_release(bh_server *server) {
+    bh_server_node *server_node = NULL;
+
     free(server->clients);
     pthread_mutex_destroy(&(server->clients_lock));
-    if (server->sock_fd != 0) {
-        bh_socket_close(server->sock_fd);
+    while (server->first) {
+        server_node = server->first;
+        server->first = server->first->next;
+        bh_socket_close(server_node->sock_fd);
+        free(server_node);
     }
     free(server);
     server = NULL;
 }
 
 void
-bh_server_client_accept(bh_event *event, bh_server *server, char *type) {
+bh_server_client_accept(bh_event *event, bh_server *server, int server_fd, char *type) {
     bh_client *client = (bh_client *)malloc(sizeof(bh_client));
 
-    client->sock_fd = bh_socket_accept(server->sock_fd, &client->ip, &client->port);
+    client->sock_fd = bh_socket_accept(server_fd, &client->ip, &client->port);
     printf("new client ip: %s, port: %d, fd:%d\n", client->ip, client->port, client->sock_fd);
     bh_socket_nonblocking(client->sock_fd);
     client->recv_buffer = bh_buffer_create(1024, 8*1024);
@@ -591,6 +613,19 @@ down_to_up(bh_lua_module *lua_module, bh_server *server, int sock_fd) {
     }
 }
 
+static int
+_find_server(bh_server *server, int fd) {
+    bh_server_node *server_node = server->first;
+
+    while (server_node) {
+        if (server_node->sock_fd == fd) {
+            return 1;
+        }
+        server_node = server_node->next;
+    }
+    return 0;
+}
+
 void
 bh_server_run(bh_thread_pool *thread_pool, bh_lua_module *lua_module, bh_event *event, bh_server *server, bh_timer *timer) {
     int events_num = 0, i, timeout;
@@ -599,9 +634,9 @@ bh_server_run(bh_thread_pool *thread_pool, bh_lua_module *lua_module, bh_event *
         timeout = bh_timer_get(timer);
         events_num = bh_event_poll(event, event->max_events, timeout);
         for (i=0; i<events_num; i++) {
-            if (event->events[i].fd == server->sock_fd) {
+            if (_find_server(server, event->events[i].fd)) {
                 // accept new client
-                bh_accept_task_arg *accept_task_arg = bh_accept_task_generator(event, server, "normal");
+                bh_accept_task_arg *accept_task_arg = bh_accept_task_generator(event, server, event->events[i].fd, "normal");
                 bh_thread_pool_add_task(thread_pool, bh_task_executer, bh_task_generator(ACCEPT, (void *)accept_task_arg), -1, bh_task_terminator);
             } else {
                 if (event->events[i].read) {

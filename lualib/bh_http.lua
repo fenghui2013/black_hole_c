@@ -41,13 +41,20 @@ function protocol_parser(sock_fd, data, len)
     local index = 1
     local first_line = true
     local path, args = nil, nil
+    local b, e, str = nil, nil, nil
+    print("hello world")
     while true do
-        local b, e, str = get_newline(data, index)
+        b, e, str = get_newline(data, index)
         print(b, e, str)
         if b == nil then
-            coroutine.yield(100, len+1-index)
+            sock_fd, data, len = coroutine.yield(100, len+1-index)
+            index = 1
+            b, e, str = get_newline(data, index)
         end
         if str == "" then
+            if first_line then
+                return 400, len+1-index
+            end
             --body
             if cgi_envs[sock_fd]["SERVER"]["REQUEST_METHOD"] == "POST" then
             end
@@ -56,6 +63,7 @@ function protocol_parser(sock_fd, data, len)
         end
         if first_line then
             --request line
+            print("first_line")
             local method, url, httpver = string.match(str, "^(%a+)%s+(.-)%s+HTTP/([%d%.]+)$")
             print(method, url, httpver)
             assert(method and url and httpver)
@@ -113,6 +121,7 @@ function data_handler(sock_fd, data, len)
     end
 
     if not coroutines[sock_fd] then
+        print("create coroutine")
         local co = coroutine.create(protocol_parser)
         coroutines[sock_fd] = co
     end
@@ -121,8 +130,8 @@ function data_handler(sock_fd, data, len)
     local err, code, left_len = coroutine.resume(coroutines[sock_fd], sock_fd, data, len)
     print(err, code, left_len)
 
-    global_cgi_env_set(sock_fd)
     if code == 200 then
+        global_cgi_env_set(sock_fd)
         coroutines[sock_fd] = nil
         print(SERVER["SERVER_PROTOCOL"])
         if string.find(SERVER["REQUEST_URI"], ".*%.lua") then
@@ -145,6 +154,14 @@ function data_handler(sock_fd, data, len)
         global_cgi_env_reset(sock_fd)
     elseif code == 100 then
     elseif code == 400 then
+        global_cgi_env_set(sock_fd)
+        local response = SERVER["SERVER_PROTOCOL"] .. " 400 Bad Request\r\n"
+        response = response .. "Content-type: text/html\r\n"
+        response = response .. "Content-length: 0\r\n"
+        response = response .. "\r\n"
+        print(response)
+        bh_write(sock_fd, response, #response)
+        global_cgi_env_reset(sock_fd)
     else
     end
     return left_len

@@ -1,4 +1,4 @@
-package.cpath = package.cpath .. ";./lualib_c/bh_server.so"
+package.cpath = package.cpath .. ";./lualib_c/?.so"
 
 bh = {}
 --bh.lua_module = nil
@@ -82,4 +82,10 @@ end
 
 function bh_run(module_name, run_fun)
     bh[module_name .. "_handler"] = run_fun
+end
+
+function bh_http_server_run()
+    for key, value in pairs(http) do
+        server.listen(bh_get_event(), value["ip"], value["port"])
+    end
 end

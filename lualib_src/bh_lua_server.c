@@ -8,6 +8,17 @@
 #include "bh_lua_module.h"
 
 static int
+_listen(lua_State *L) {
+    bh_event *event = (bh_event *)lua_touserdata(L, 1);
+    const char *ip = luaL_checkstring(L, 2);
+    int port = luaL_checkint(L, 3);
+
+    bh_server_listen(event, ip, port);
+
+    return 0;
+}
+
+static int
 _connect(lua_State *L) {
     bh_event *event = (bh_event *)lua_touserdata(L, 1);
     bh_server *server = (bh_server *)lua_touserdata(L, 2);
@@ -54,6 +65,7 @@ _close(lua_State *L) {
 int
 luaopen_bh_server(lua_State *L) {
     luaL_Reg l[] = {
+        {"listen", _listen},
         {"connect", _connect},
         {"send", _send},
         {"close", _close},
