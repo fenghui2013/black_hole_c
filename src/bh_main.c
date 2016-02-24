@@ -1,3 +1,8 @@
+/*
+ * 2015-07-19 biao.wang
+ * single process more threads one lua_vms is successful 
+ *
+ */
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
